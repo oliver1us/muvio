@@ -1,0 +1,9 @@
+[project]
+name = "muvio"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["fastapi>=0.115,<1", "uvicorn[standard]>=0.30,<1", "yt-dlp>=2025.1", "pydantic-settings>=2.5,<3", "python-multipart>=0.0.9", "faster-whisper>=1.1", "httpx>=0.27"]
+
+[project.optional-dependencies]
+studio = ["demucs>=4"]
+test = ["pytest>=8", "httpx>=0.27"]

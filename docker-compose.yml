@@ -1,0 +1,13 @@
+services:
+  muvio:
+    build: .
+    ports:
+      - "3838:3838"
+    volumes:
+      - muvio-data:/app/data
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped
+volumes:
+  muvio-data:
