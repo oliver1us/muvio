@@ -43,6 +43,7 @@ def test_mp3_cover_postprocessor(monkeypatch, tmp_path: Path) -> None:
             (tmp_path / "song.mp3").touch()
 
     monkeypatch.setattr(ytdlp, "validate_url", lambda url: None)
+    monkeypatch.setattr(ytdlp, "info", lambda _: {"formats": [{"format_id": "audio", "vcodec": "none", "acodec": "mp4a.40.2"}]})
     monkeypatch.setattr(ytdlp.yt_dlp, "YoutubeDL", FakeYoutubeDL)
     for embed in (True, False):
         ytdlp.download(

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chooseVideo, matchingVideo, groupSubtitles, subtitleLabel } from '../app/web/js/media.mjs';
+import { chooseVideo, matchingVideo, groupSubtitles, subtitleLabel, audioTrackLabel } from '../app/web/js/media.mjs';
 
 const choices = heights => heights.map(height => ({ height, codec: 'h264', container: 'mp4' }));
 
@@ -50,4 +50,34 @@ test('subtitle formats are deduplicated without losing original and automatic tr
 test('missing combinations and empty subtitle lists have safe empty states', () => {
   assert.equal(chooseVideo([]), null);
   assert.deepEqual(groupSubtitles([]), []);
+});
+
+test('audio language is filtered before container and resolution preferences', () => {
+  const options = [
+    { height: 720, codec: 'h264', container: 'mp4', audio_language: 'hi' },
+    { height: 480, codec: 'h264', container: 'mkv', audio_language: 'en' },
+  ];
+  assert.equal(chooseVideo(options, { audioLanguage: 'en' }).container, 'mkv');
+  assert.equal(chooseVideo(options, { audioLanguage: 'en' }).height, 480);
+  assert.equal(chooseVideo(options, { audioLanguage: 'en', container: 'mp4' }), null);
+  assert.equal(chooseVideo(options, { audioLanguage: 'es' }), null);
+});
+
+test('video preview breaks quality ties in the same order as the backend', () => {
+  const options = [
+    { ...choices([720])[0], fps: 30, tbr: 900, video_id: 'v1' },
+    { ...choices([720])[0], fps: 60, tbr: 800, video_id: 'v2' },
+    { ...choices([720])[0], fps: 60, tbr: 900, video_id: 'v3' },
+  ];
+  assert.equal(chooseVideo(options).video_id, 'v3');
+  assert.equal(chooseVideo(options.reverse()).video_id, 'v3');
+});
+
+test('audio labels distinguish source originals, regional variants and unknown tags', () => {
+  assert.equal(audioTrackLabel({ language: 'en', is_original: true }), 'English · Original');
+  assert.equal(audioTrackLabel({ language: 'hi' }), 'Hindi');
+  assert.match(audioTrackLabel({ language: 'es-419' }), /Spanish/);
+  assert.equal(audioTrackLabel({ language: 'en-desc' }), 'English · Audio description');
+  assert.equal(audioTrackLabel({ language: 'und' }), 'Unknown language');
+  assert.equal(audioTrackLabel(null), 'Unknown language');
 });

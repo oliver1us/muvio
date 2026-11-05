@@ -7,8 +7,9 @@ const preferences = [
 export const codecLabels = { h264: 'H.264', vp9: 'VP9', av1: 'AV1' };
 export const containerLabels = { mp4: 'MP4', webm: 'WebM', mkv: 'MKV' };
 
-export function matchingVideo(options, { codec = 'auto', container = 'auto', embed = false } = {}) {
+export function matchingVideo(options, { codec = 'auto', container = 'auto', embed = false, audioLanguage } = {}) {
   return options.filter(option =>
+    (!audioLanguage || option.audio_language === audioLanguage) &&
     (codec === 'auto' || option.codec === codec) &&
     (container === 'auto' || option.container === container) &&
     (!embed || ['mp4', 'mkv'].includes(option.container)));
@@ -31,9 +32,27 @@ export function chooseVideo(options, settings = {}) {
   for (const [codec, container] of preferences) {
     const preferred = candidates.filter(option => option.codec === codec && option.container === container);
     if (!preferred.length) continue;
-    return preferred.reduce((a, b) => a.height >= b.height ? a : b);
+    return preferred.reduce((a, b) => {
+      const rank = item => [item.height, item.fps || 0, item.tbr || 0, item.video_id || '', item.audio_id || ''];
+      const left = rank(a), right = rank(b);
+      for (let i = 0; i < left.length; i++) {
+        if (left[i] !== right[i]) return left[i] > right[i] ? a : b;
+      }
+      return a;
+    });
   }
   return null;
+}
+
+export function audioTrackLabel(track) {
+  if (!track) return 'Unknown language';
+  const descriptive = track.language.endsWith('-desc');
+  const code = descriptive ? track.language.slice(0, -5) : track.language;
+  let name;
+  if (code !== 'und') {
+    try { name = new Intl.DisplayNames(['en'], { type: 'language' }).of(code); } catch { /* Nonstandard source tag. */ }
+  }
+  return `${name || (code === 'und' ? 'Unknown language' : code)}${descriptive ? ' · Audio description' : ''}${track.is_original ? ' · Original' : ''}`;
 }
 
 export function groupSubtitles(tracks, languages = ['en']) {

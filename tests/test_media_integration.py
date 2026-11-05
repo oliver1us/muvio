@@ -33,6 +33,11 @@ def video_hashes(path):
                "-show_entries", "packet=data_hash", "-of", "csv=p=0", str(path))
 
 
+def audio_hashes(path):
+    return run("ffprobe", "-v", "error", "-select_streams", "a:0", "-show_packets", "-show_data_hash", "sha256",
+               "-show_entries", "packet=data_hash", "-of", "csv=p=0", str(path))
+
+
 @pytest.fixture(scope="module")
 def source_media(tmp_path_factory):
     root = tmp_path_factory.mktemp("source-media")
@@ -42,6 +47,9 @@ def source_media(tmp_path_factory):
         "-c:a", "aac", "-shortest", str(combined))
     run("ffmpeg", "-v", "error", "-i", str(combined), "-an", "-c:v", "copy", str(root / "silent.mp4"))
     run("ffmpeg", "-v", "error", "-i", str(combined), "-vn", "-c:a", "copy", str(root / "audio.m4a"))
+    for code, frequency in (("hi", 880), ("es", 660)):
+        run("ffmpeg", "-v", "error", "-f", "lavfi", "-i", f"sine=frequency={frequency}:duration=1",
+            "-c:a", "aac", str(root / f"audio-{code}.m4a"))
     (root / "en.vtt").write_text("WEBVTT\n\n00:00.000 --> 00:00.800\nA quiet afternoon.\n", encoding="utf-8")
 
     class QuietHandler(SimpleHTTPRequestHandler):
@@ -60,7 +68,7 @@ def source_media(tmp_path_factory):
 @pytest.fixture
 def offline_extractor(monkeypatch, source_media):
     root, origin = source_media
-    state = {"separate": False, "silent": False}
+    state = {"separate": False, "silent": False, "multilingual": False}
 
     class OfflineMediaIE(InfoExtractor):
         _VALID_URL = r"https://offline\.example/(?P<id>clip)"
@@ -68,7 +76,12 @@ def offline_extractor(monkeypatch, source_media):
         def _real_extract(self, url):
             video = {"format_id": "video", "url": origin + "/silent.mp4", "ext": "mp4", "height": 144,
                      "width": 256, "vcodec": "avc1.64000c", "acodec": "none", "fps": 5}
-            if state["separate"]:
+            if state["multilingual"]:
+                formats = [video, *({"format_id": f"audio-{code}", "url": origin + "/" + name,
+                                    "ext": "m4a", "vcodec": "none", "acodec": "mp4a.40.2", "language": code,
+                                    "language_preference": 10 if code == "en" else 5, "abr": 64 if code == "en" else 128}
+                                   for code, name in (("hi", "audio-hi.m4a"), ("en", "audio.m4a"), ("es", "audio-es.m4a")))]
+            elif state["separate"]:
                 formats = [video, {"format_id": "audio", "url": origin + "/audio.m4a", "ext": "m4a",
                                    "vcodec": "none", "acodec": "mp4a.40.2", "abr": 64}]
             elif state["silent"]:
@@ -125,3 +138,18 @@ def test_real_audio_extraction_from_combined_video(offline_extractor, tmp_path, 
     streams = probe(result)["streams"]
     assert len(streams) == 1 and streams[0]["codec_name"] == codec
     assert streams[0]["codec_type"] == "audio"
+
+
+@pytest.mark.parametrize("mode", ["audio", "video"])
+@pytest.mark.parametrize(("language", "source"), [("original", "audio.m4a"), ("es", "audio-es.m4a"), ("hi", "audio-hi.m4a")])
+def test_real_multilingual_download_contains_the_selected_audio(offline_extractor, tmp_path, mode, language, source):
+    state, root = offline_extractor
+    state["multilingual"] = True
+    request = DownloadRequest(url="https://offline.example/clip", downloadMode=mode,
+                              audioLanguage=language, audioFormat="best", embedThumbnail=False)
+    data = ytdlp.info(request.url)
+    assert data["defaultAudioLanguage"] == "en"
+    result = ytdlp.download(request.url, tmp_path / "multilingual", request, lambda *_: None, lambda: False)
+    assert audio_hashes(result) == audio_hashes(root / source), "The delivered audio must be the selected language, not a higher-bitrate dub"
+    if mode == "video":
+        assert video_hashes(result) == video_hashes(root / "combined.mp4")

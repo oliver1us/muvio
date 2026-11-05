@@ -375,3 +375,76 @@ def test_error_and_unknown_fragment_are_safe(ui):
     find_media(page)
     expect(page.locator("#videoPanel")).to_be_visible()
     expect(page.locator("#message")).not_to_be_visible()
+
+
+def multilingual_media():
+    return media() | {
+        "audioTracks": [{"language": "en", "is_original": True}, {"language": "es", "is_original": False},
+                        {"language": "hi", "is_original": False}],
+        "defaultAudioLanguage": "en",
+        "videoOptions": [{"codec": "h264", "container": "mp4", "height": 720,
+                          "audio_language": code, "audio_original": code == "en"} for code in ("en", "es", "hi")],
+    }
+
+
+def test_audio_language_preview_selection_payload_and_reset(ui):
+    page, state = ui
+    state["media"] = multilingual_media()
+    find_media(page)
+    expect(page.locator("#videoAudioLanguage")).to_be_visible()
+    expect(page.locator("#videoAudioLanguage")).to_have_value("original")
+    expect(page.locator("#videoAudioSummary")).to_have_text("Audio: English · Original")
+    page.locator("#videoDownload").click()
+    expect(page.locator("#toastText")).to_contain_text("Video download added")
+    payload = [body for _, path, body in state["requests"] if path == "/api/download"][-1]
+    assert payload["audioLanguage"] == "en"
+    page.locator("#videoAudioLanguage").select_option("es")
+    expect(page.locator("#videoAudioSummary")).to_have_text("Audio: Spanish")
+    page.locator("#videoDownload").click()
+    expect(page.locator("#activityCount")).to_have_text("2")
+    payload = [body for _, path, body in state["requests"] if path == "/api/download"][-1]
+    assert payload["audioLanguage"] == "es" and payload["subtitleLang"] is None
+    page.locator("#videoAdvanced > summary").click()
+    page.locator("#resetVideo").click()
+    expect(page.locator("#videoAudioLanguage")).to_have_value("original")
+    expect(page.locator("#videoAudioSummary")).to_have_text("Audio: English · Original")
+    page.locator("#audioTab").click()
+    expect(page.locator("#audioTrackSummary")).to_have_text("Audio: English · Original")
+    page.locator("#audioLanguage").select_option("hi")
+    expect(page.locator("#audioTrackSummary")).to_have_text("Audio: Hindi")
+    page.locator("#audioDownload").click()
+    expect(page.locator("#activityCount")).to_have_text("3")
+    payload = [body for _, path, body in state["requests"] if path == "/api/download"][-1]
+    assert payload["audioLanguage"] == "hi" and payload["downloadMode"] == "audio"
+
+
+def test_audio_language_changes_available_video_combinations(ui):
+    page, state = ui
+    data = multilingual_media()
+    data["videoOptions"] = [option | {"container": "mkv" if option["audio_language"] == "es" else "mp4"}
+                            for option in data["videoOptions"]]
+    state["media"] = data
+    find_media(page)
+    page.locator("#videoAudioLanguage").select_option("es")
+    expect(page.locator("#videoSummary")).to_have_text("MKV · 720p")
+    page.locator("#videoAdvanced > summary").click()
+    expect(page.locator('#container option[value="mp4"]')).to_have_js_property("disabled", True)
+    page.locator("#container").select_option("mkv")
+    page.locator("#videoAudioLanguage").select_option("en")
+    expect(page.locator("#videoDownload")).to_be_disabled()
+    expect(page.locator("#videoAudioSummary")).to_contain_text("not available together")
+    page.locator("#resetVideo").click()
+    expect(page.locator("#videoDownload")).to_be_enabled()
+
+
+def test_missing_original_metadata_and_unknown_language_are_not_guessed(ui):
+    page, state = ui
+    state["media"] = media() | {
+        "audioTracks": [{"language": "und", "is_original": False}], "defaultAudioLanguage": "und",
+        "videoOptions": [{"codec": "h264", "container": "mp4", "height": 720,
+                          "audio_language": "und", "audio_original": False}],
+    }
+    find_media(page)
+    expect(page.locator("#videoAudioSummary")).to_contain_text("Unknown language")
+    expect(page.locator("#videoAudioSummary")).to_contain_text("Original track not identified")
+    expect(page.locator("#videoAudioLanguage option")).to_have_count(2)

@@ -114,6 +114,8 @@ main { max-width: 800px; margin: auto; padding: 72px 24px 30px; }
 .selection-label { font-size: 9px; font-weight: 600; letter-spacing: .14em; color: #8997b2; }
 .selection-summary p { font-size: 19px; margin: 5px 0 4px; font-weight: 500; line-height: 1.3; overflow-wrap: anywhere; }
 .selection-summary .muted { font-size: 12px; }
+.audio-track-summary { display: block; margin-top: 6px; overflow-wrap: anywhere; }
+.audio-language { margin-bottom: 18px; }
 .recommendation { color: #b0c5fa; background: #202f4f; border: 1px solid #344b77; border-radius: 5px; padding: 4px 7px; font-size: 10px; white-space: nowrap; }
 .download-button { width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 15px; padding: 13px 18px; border-radius: 9px; }
 .download-button > span { font-size: 19px; line-height: 1; }

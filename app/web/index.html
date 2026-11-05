@@ -62,7 +62,8 @@
 
       <section id="videoPanel" class="card download-card" role="tabpanel" aria-labelledby="videoTab" tabindex="0">
         <div class="download-heading"><span class="format-icon" aria-hidden="true">▷</span><div><h3>Keep the whole picture.</h3><p id="videoTagline" class="muted">A ready-to-play video, with sound.</p></div></div>
-        <div class="selection-summary"><div><span class="selection-label">YOUR DOWNLOAD</span><p id="videoSummary">Automatic</p><span id="videoDescription" class="muted">A good balance of quality and file size.</span></div><span id="videoBadge" class="recommendation">Recommended</span></div>
+        <div class="selection-summary"><div><span class="selection-label">YOUR DOWNLOAD</span><p id="videoSummary">Automatic</p><span id="videoDescription" class="muted">A good balance of quality and file size.</span><span id="videoAudioSummary" class="muted audio-track-summary" role="status"></span></div><span id="videoBadge" class="recommendation">Recommended</span></div>
+        <label id="videoAudioLanguageLabel" class="audio-language" for="videoAudioLanguage">Audio language<select id="videoAudioLanguage"></select></label>
         <p id="videoWarning" class="inline-notice" role="status" hidden></p>
         <button class="primary download-button" id="videoDownload" type="button">Download video <span aria-hidden="true">↓</span></button>
         <details id="videoAdvanced" class="advanced">
@@ -76,7 +77,8 @@
 
       <section id="audioPanel" class="card download-card" role="tabpanel" aria-labelledby="audioTab" tabindex="0" hidden>
         <div class="download-heading"><span class="format-icon" aria-hidden="true">♫</span><div><h3>Just the sound.</h3><p class="muted">Music, podcasts, and everything worth listening to.</p></div></div>
-        <div class="selection-summary"><div><span class="selection-label">YOUR DOWNLOAD</span><p id="audioSummary">Automatic (MP3)</p><span id="audioDescription" class="muted">High-quality audio. Easy to play and share.</span></div><span class="recommendation" id="audioBadge">Recommended</span></div>
+        <div class="selection-summary"><div><span class="selection-label">YOUR DOWNLOAD</span><p id="audioSummary">Automatic (MP3)</p><span id="audioDescription" class="muted">High-quality audio. Easy to play and share.</span><span id="audioTrackSummary" class="muted audio-track-summary" role="status"></span></div><span class="recommendation" id="audioBadge">Recommended</span></div>
+        <label id="audioLanguageLabel" class="audio-language" for="audioLanguage">Audio language<select id="audioLanguage"></select></label>
         <button class="primary download-button" id="audioDownload" type="button">Download audio <span aria-hidden="true">↓</span></button>
         <details class="advanced"><summary>Advanced options <span class="advanced-chevron" aria-hidden="true">⌄</span></summary><div class="fields"><label for="audioFormat">Audio format<select id="audioFormat"><option value="mp3">Automatic (MP3)</option><option value="best">Original audio · no conversion</option><option value="m4a">M4A (AAC)</option><option value="opus">Opus</option><option value="ogg">OGG (Vorbis)</option><option value="wav">WAV</option><option value="flac">FLAC</option></select></label><label for="bitrate">Bitrate<select id="bitrate"><option value="320">320 kbps · high quality</option><option value="256">256 kbps</option><option value="128">128 kbps</option><option value="96">96 kbps</option><option value="64">64 kbps</option></select></label></div><label class="check"><input id="cover" type="checkbox" checked> Include cover art when available</label><p id="audioHint" class="muted advanced-note">A higher output bitrate does not restore quality missing from the source.</p></details>
       </section>

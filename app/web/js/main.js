@@ -1,5 +1,5 @@
 // Dependency-free frontend for the Muvio JSON API.
-import { chooseVideo, matchingVideo, codecLabels, containerLabels, groupSubtitles, subtitleLabel } from './media.mjs';
+import { chooseVideo, matchingVideo, codecLabels, containerLabels, groupSubtitles, subtitleLabel, audioTrackLabel } from './media.mjs';
 
 const $ = id => document.getElementById(id);
 const number = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
@@ -92,7 +92,31 @@ function setTab(name, focus = false, sync = true) {
 }
 
 function videoSettings() {
-  return { codec: $('codec').value, container: $('container').value, quality: $('quality').value, embed: Boolean($('embedSubtitle').value) };
+  return { codec: $('codec').value, container: $('container').value, quality: $('quality').value, embed: Boolean($('embedSubtitle').value), audioLanguage: selectedAudioLanguage('videoAudioLanguage') };
+}
+
+function selectedAudioLanguage(id) {
+  return $(id).value === 'original' ? current?.defaultAudioLanguage : $(id).value || undefined;
+}
+
+function audioSummary(id, hasAudio, original) {
+  if (!hasAudio) return 'No audio track';
+  const track = current.audioTracks?.find(item => item.language === selectedAudioLanguage(id));
+  const label = audioTrackLabel(track && { ...track, is_original: original ?? track.is_original });
+  const unknownOriginal = $(id).value === 'original' && !track?.is_original;
+  return `Audio: ${label}${unknownOriginal ? ' · Original track not identified by source' : ''}`;
+}
+
+function renderAudioLanguages() {
+  const available = current.audioTracks || [];
+  const preferred = available.find(track => track.language === current.defaultAudioLanguage);
+  const automatic = preferred?.is_original ? `Original (${audioTrackLabel({ ...preferred, is_original: false })})` : 'Automatic · prefer original';
+  for (const id of ['videoAudioLanguage', 'audioLanguage']) {
+    $(id).replaceChildren(option('original', automatic), ...available.map(track => option(track.language, audioTrackLabel(track))));
+    $(id).value = 'original';
+    $(id).disabled = !available.length;
+    $(id + 'Label').hidden = !current.audioStreams?.length;
+  }
 }
 
 function updateVideo() {
@@ -119,21 +143,23 @@ function updateVideo() {
   $('quality').replaceChildren(...qualityOptions);
   $('quality').value = quality;
   const choice = chooseVideo(options, settings);
-  const automatic = settings.codec === 'auto' && settings.container === 'auto' && settings.quality === 'auto';
+  const automatic = settings.codec === 'auto' && settings.container === 'auto' && settings.quality === 'auto' && $('videoAudioLanguage').value === 'original';
   $('videoBadge').hidden = !automatic || !choice;
   $('videoDownload').disabled = !choice || Boolean($('videoDownload').dataset.busy);
   $('videoWarning').hidden = true;
   if (!choice) {
+    $('videoAudioSummary').textContent = hasAudio ? 'The selected audio language and video settings are not available together.' : 'No audio track';
     $('videoSummary').textContent = options.length ? 'This combination is unavailable' : 'No supported video found';
     $('videoDescription').textContent = options.length ? 'Choose another option, or reset to automatic.' : 'Try the Audio or Subtitles tab instead.';
     $('videoTechnical').textContent = 'MP4 works with H.264 and AAC. WebM requires VP9 or AV1 with Opus or Vorbis. Use MP4 or MKV to include subtitles.';
     $('videoWarning').textContent = settings.embed && settings.container === 'webm'
       ? 'To include subtitles in this app, choose MP4, MKV, or Automatic.'
-      : 'The selected format, codec, and resolution must be available together. No download will start with this combination.';
+      : 'The selected audio language, format, codec, and resolution must be available together. No download will start with this combination.';
     $('videoWarning').hidden = !options.length;
     return;
   }
   const resolution = choice.height ? `${choice.height}p` : 'source resolution';
+  $('videoAudioSummary').textContent = audioSummary('videoAudioLanguage', hasAudio, choice.audio_original);
   $('videoSummary').textContent = automatic ? `Automatic (${containerLabels[choice.container]} · ${resolution})` : `${containerLabels[choice.container]} · ${resolution}`;
   $('videoDescription').textContent = automatic
     ? (choice.height > 720 ? 'No version at or below 720p is available. Using the lowest source resolution.' : 'A good balance of quality and file size.')
@@ -149,9 +175,11 @@ function updateVideo() {
 function updateAudio() {
   if (!current) return;
   const format = $('audioFormat').value;
-  const automatic = format === 'mp3' && $('bitrate').value === '320';
+  const automatic = format === 'mp3' && $('bitrate').value === '320' && $('audioLanguage').value === 'original';
   const hasAudio = Boolean(current.audioStreams?.length);
-  $('audioDownload').disabled = !hasAudio || Boolean($('audioDownload').dataset.busy);
+  const validLanguage = !current.audioTracks?.length || current.audioTracks.some(track => track.language === selectedAudioLanguage('audioLanguage'));
+  $('audioDownload').disabled = !hasAudio || !validLanguage || Boolean($('audioDownload').dataset.busy);
+  $('audioTrackSummary').textContent = audioSummary('audioLanguage', hasAudio);
   $('audioSummary').textContent = !hasAudio ? 'No audio found' : automatic ? 'Automatic (MP3)' : format === 'best' ? 'Original audio' : ['wav', 'flac'].includes(format) ? format.toUpperCase() : `${format.toUpperCase()} · ${$('bitrate').value} kbps`;
   $('audioBadge').hidden = !hasAudio || !automatic;
   $('bitrate').disabled = ['best', 'wav', 'flac'].includes(format);
@@ -214,6 +242,7 @@ function renderInfo(data, url) {
   $('audioFormat').value = 'mp3';
   $('bitrate').value = '320';
   $('cover').checked = true;
+  renderAudioLanguages();
   $('ai').checked = false;
   $('aiLabel').textContent = `Send transcript to optional AI cleanup · about ${number.format(Math.ceil((data.duration || 60) * 3))} tokens`;
   tracks = groupSubtitles(data.subtitles || [], navigator.languages);
@@ -416,9 +445,9 @@ document.querySelectorAll('.tab').forEach(button => {
   };
 });
 window.addEventListener('hashchange', () => { if (current) setTab(location.hash.slice(1), false, false); });
-for (const id of ['quality', 'codec', 'container', 'embedSubtitle']) $(id).onchange = updateVideo;
-$('resetVideo').onclick = () => { for (const id of ['quality', 'codec', 'container']) $(id).value = 'auto'; updateVideo(); };
-for (const id of ['audioFormat', 'bitrate']) $(id).onchange = updateAudio;
+for (const id of ['quality', 'codec', 'container', 'embedSubtitle', 'videoAudioLanguage']) $(id).onchange = updateVideo;
+$('resetVideo').onclick = () => { for (const id of ['quality', 'codec', 'container']) $(id).value = 'auto'; $('videoAudioLanguage').value = 'original'; updateVideo(); };
+for (const id of ['audioFormat', 'bitrate', 'audioLanguage']) $(id).onchange = updateAudio;
 $('subtitleSearch').oninput = renderSubtitles;
 $('subtitleTrack').onchange = $('subtitleFormat').onchange = updateSubtitle;
 $('embedSelected').onclick = () => { const track = selectedTrack(); if (!track) return; $('embedSubtitle').value = track.key; updateVideo(); $('videoAdvanced').open = true; setTab('video', true); };
@@ -428,7 +457,7 @@ for (const mode of ['video', 'audio']) $(mode + 'Download').onclick = () => busy
   const settings = videoSettings();
   const track = tracks.find(item => item.key === $('embedSubtitle').value);
   const payload = {
-    url: currentUrl, downloadMode: mode,
+    url: currentUrl, downloadMode: mode, audioLanguage: selectedAudioLanguage(mode === 'video' ? 'videoAudioLanguage' : 'audioLanguage') || 'original',
     ...(mode === 'video' ? { videoQuality: settings.quality, videoCodec: settings.codec, videoContainer: settings.container,
       subtitleLang: track?.lang || null, subtitleAutomatic: Boolean(track?.is_automatic), embedSubtitles: Boolean(track) } : {
       audioFormat: $('audioFormat').value, audioBitrate: $('bitrate').value, embedThumbnail: !$('cover').disabled && $('cover').checked,

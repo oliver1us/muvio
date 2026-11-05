@@ -14,6 +14,7 @@ class DownloadRequest(BaseModel):
     videoCodec: Literal["auto", "h264", "vp9", "av1"] = "auto"
     audioFormat: Literal["best", "mp3", "m4a", "opus", "ogg", "wav", "flac"] = "mp3"
     audioBitrate: Literal["320", "256", "128", "96", "64"] = "320"
+    audioLanguage: str = Field(default="original", min_length=1, max_length=64)
     subtitleLang: str | None = None
     subtitleAutomatic: bool = False
     downloadSubtitles: bool = False

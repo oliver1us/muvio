@@ -42,13 +42,13 @@ def get_job(job_id: str) -> Job:
 
 async def download_operation(job: Job, payload: DownloadRequest) -> None:
     """Execute media extraction and optional audio post-processing."""
-    from app.engine.formats import build_plan
+    from app.engine.formats import audio_conversion
     folder = settings.output_dir / job.id
     try:
         result = await anyio.to_thread.run_sync(ytdlp.download, payload.url, folder, payload, lambda p, s, e, stage: queue.update(job, p, s, e, stage), lambda: job.cancelled)
         if job.cancelled:
             raise AppError("job.cancelled", "The job was cancelled.")
-        conversion = build_plan(payload).audio_conversion if payload.downloadMode == "audio" else None
+        conversion = audio_conversion(payload)
         if conversion:
             queue.update(job, 99, None, None, "Converting audio")
             original = result
@@ -105,9 +105,11 @@ async def download(payload: DownloadRequest, request: Request) -> dict:
     if payload.embedSubtitles or payload.downloadSubtitles:
         if not any(track["lang"] == payload.subtitleLang and track["is_automatic"] == payload.subtitleAutomatic for track in data["subtitles"]):
             raise AppError("format.unavailable", "The selected subtitle language and track type are not available.")
-    if payload.downloadMode != "audio":
-        from app.engine.formats import build_plan
-        build_plan(payload, data["formats"])
+    from app.engine.formats import build_plan
+    plan = build_plan(payload, data["formats"])
+    if plan.audio_language:
+        # Pin what was previewed/validated even if extraction is refreshed while queued.
+        payload = payload.model_copy(update={"audioLanguage": plan.audio_language})
     job = queue.submit("download", payload.url, lambda j: download_operation(j, payload))
     return {"status": "local-processing", "url": signed_url(request, job), "filename": None, "output": {"job_id": job.id}}
 

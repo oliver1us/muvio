@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 
 import yt_dlp
 
+from app.engine.audio import audio_tracks
 from app.engine.formats import build_plan, video_options
 from app.engine.naming import filename, unique
 from app.errors import AppError
@@ -82,11 +83,13 @@ def info(url: str) -> dict:
         entries = [{"id": e.get("id"), "title": e.get("title"), "url": e.get("webpage_url") or e.get("url")} for e in raw["entries"] if e]
     else:
         entries = []
-    formats = [{"format_id": f.get("format_id"), "ext": f.get("ext"), "resolution": f.get("resolution"), "height": f.get("height"), "fps": f.get("fps"), "vcodec": f.get("vcodec"), "acodec": f.get("acodec"), "filesize": f.get("filesize"), "filesize_approx": f.get("filesize_approx"), "abr": f.get("abr"), "vbr": f.get("vbr"), "tbr": f.get("tbr"), "note": f.get("format_note"), "has_audio": f.get("acodec") not in (None, "none"), "has_video": f.get("vcodec") not in (None, "none")} for f in raw.get("formats") or []]
+    formats = [{"format_id": f.get("format_id"), "ext": f.get("ext"), "resolution": f.get("resolution"), "height": f.get("height"), "fps": f.get("fps"), "vcodec": f.get("vcodec"), "acodec": f.get("acodec"), "filesize": f.get("filesize"), "filesize_approx": f.get("filesize_approx"), "abr": f.get("abr"), "asr": f.get("asr"), "vbr": f.get("vbr"), "tbr": f.get("tbr"), "language": f.get("language"), "language_preference": f.get("language_preference"), "note": f.get("format_note"), "has_audio": f.get("acodec") not in (None, "none"), "has_video": f.get("vcodec") not in (None, "none")} for f in raw.get("formats") or []]
     data = {k: raw.get(k) for k in ("title", "uploader", "duration", "thumbnail", "webpage_url", "extractor", "is_live", "id")}
     data.update(formats=formats, subtitles=tracks(raw), entries=entries, audioStreams=[f for f in formats if f["has_audio"]], videoStreams=[f for f in formats if f["has_video"]])
+    data["audioTracks"] = audio_tracks(formats)
+    data["defaultAudioLanguage"] = data["audioTracks"][0]["language"] if data["audioTracks"] else None
     combinations = video_options(formats)
-    data["videoOptions"] = [dict(codec=codec, container=container, height=height) for codec, container, height in sorted({(o["codec"], o["container"], o["height"]) for o in combinations})]
+    data["videoOptions"] = combinations
     _cache[url] = (time.time(), data)
     return data
 
@@ -95,7 +98,7 @@ def download(url: str, folder: Path, request: DownloadRequest, progress: Callabl
     """Download to a job-owned folder; capture the actual postprocessed file."""
     validate_url(url)
     folder.mkdir(parents=True, exist_ok=True)
-    plan = build_plan(request, info(url)["formats"] if request.downloadMode != "audio" else None)
+    plan = build_plan(request, info(url)["formats"])
     def hook(data: dict) -> None:
         if cancelled():
             raise AppError("job.cancelled", "The job was cancelled.")
