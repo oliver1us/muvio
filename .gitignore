@@ -4,3 +4,4 @@ PLAN*
 __pycache__/
 *.pyc
 data/
+.pytest*
