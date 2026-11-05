@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -62,6 +63,13 @@ async def authenticate(request: Request, call_next):
 async def app_error(request: Request, exc: AppError):
     """Return structured application failures."""
     return JSONResponse(error_body(exc.code, str(exc)), status_code=exc.status_code)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_error(request: Request, exc: StarletteHTTPException):
+    """Keep HTTP failures in the same top-level error envelope."""
+    body = exc.detail if isinstance(exc.detail, dict) and exc.detail.get("status") == "error" else error_body("file.not_found" if exc.status_code == 404 else "internal.error", str(exc.detail))
+    return JSONResponse(body, status_code=exc.status_code)
 
 
 @app.exception_handler(RequestValidationError)

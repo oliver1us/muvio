@@ -51,7 +51,21 @@ async def download_operation(job: Job, payload: DownloadRequest) -> None:
         conversion = build_plan(payload).audio_conversion
         if conversion:
             queue.update(job, 99, None, None, "Converting audio")
-            result = await ffmpeg.extract_audio(result, result.with_suffix("." + conversion[0]), *conversion)
+            original = result
+            target = original.with_suffix("." + conversion[0])
+            if target == original:
+                target = original.with_name(original.stem + ".converted" + original.suffix)
+            result = await ffmpeg.extract_audio(result, target, *conversion)
+            if payload.audioFormat == "m4a" and payload.embedThumbnail:
+                covers = [image for image in folder.iterdir() if image.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}]
+                if covers:
+                    result = await ffmpeg.attach_cover(result, covers[0], result.with_name(result.stem + ".cover.m4a"))
+                    target.unlink(missing_ok=True)
+                else:
+                    job.warning = "cover.unavailable: The source did not provide cover art."
+            final = original.with_suffix("." + conversion[0])
+            result.replace(final)
+            result = final
         job.output_path, job.filename = str(result), result.name
     except asyncio.CancelledError:
         job.cancelled = True

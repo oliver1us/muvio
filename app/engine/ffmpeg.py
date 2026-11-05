@@ -19,10 +19,14 @@ async def run(*args: str, timeout: float = 3600) -> bytes:
         process = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         try:
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout)
-        except (asyncio.CancelledError, TimeoutError):
+        except asyncio.CancelledError:
             process.kill()
             await process.communicate()
             raise
+        except TimeoutError as exc:
+            process.kill()
+            await process.communicate()
+            raise AppError("ffmpeg.failed", "Media processing timed out.") from exc
         if process.returncode:
             raise AppError("ffmpeg.failed", "Media processing failed: " + stderr.decode(errors="replace")[-1200:])
         return stdout
@@ -33,10 +37,16 @@ async def run(*args: str, timeout: float = 3600) -> bytes:
 async def extract_audio(source: Path, target: Path, codec: str = "wav", bitrate: str | None = None) -> Path:
     """Extract audio to the chosen container."""
     encoders = {"m4a": "aac", "opus": "libopus", "wav": "pcm_s16le", "mp3": "libmp3lame", "flac": "flac", "ogg": "libvorbis"}
-    args = [settings.ffmpeg_path, "-y", "-i", str(source), "-vn", "-c:a", encoders[codec]]
+    args = [settings.ffmpeg_path, "-y", "-i", str(source), "-map_metadata", "0", "-vn", "-c:a", encoders[codec]]
     if bitrate and codec not in {"wav", "flac"}:
         args += ["-b:a", bitrate + "k"]
     await run(*(args + [str(target)]))
+    return target
+
+
+async def attach_cover(source: Path, image: Path, target: Path) -> Path:
+    """Attach an image to M4A audio after conversion without changing the audio."""
+    await run(settings.ffmpeg_path, "-y", "-i", str(source), "-i", str(image), "-map", "0:a", "-map", "1:v:0", "-c:a", "copy", "-c:v", "mjpeg", "-disposition:v:0", "attached_pic", str(target))
     return target
 
 

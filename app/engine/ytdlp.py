@@ -104,7 +104,8 @@ def download(url: str, folder: Path, request: DownloadRequest, progress: Callabl
     if plan.container:
         opts["merge_output_format"] = plan.container
     if opts["writethumbnail"]:
-        opts["postprocessors"].append({"key": "FFmpegEmbedThumbnail"})
+        if request.audioFormat != "m4a":
+            opts["postprocessors"].append({"key": "FFmpegEmbedThumbnail"})
     if request.embedMetadata:
         opts["postprocessors"].append({"key": "FFmpegMetadata"})
     if request.downloadSubtitles or request.embedSubtitles:
