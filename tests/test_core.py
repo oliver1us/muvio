@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.engine.formats import build_plan
-from app.engine import ffmpeg
+from app.engine import ffmpeg, ytdlp
 from app.engine.naming import filename, sanitize, unique
 from app.engine.subtitles import vtt_to_srt
 from app.errors import CODES
@@ -23,6 +23,39 @@ def test_format_plans() -> None:
     assert audio.postprocessors[0] == {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "320"}
     video = build_plan(DownloadRequest(url="https://example.com", videoContainer="mkv"))
     assert video.container == "mkv" and not video.postprocessors
+
+
+def test_mp3_cover_postprocessor(monkeypatch, tmp_path: Path) -> None:
+    """Default MP3 downloads use yt-dlp's valid thumbnail postprocessor."""
+    options_seen = []
+
+    class FakeYoutubeDL:
+        def __init__(self, options):
+            options_seen.append(options)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def download(self, urls):
+            (tmp_path / "song.mp3").touch()
+
+    monkeypatch.setattr(ytdlp, "validate_url", lambda url: None)
+    monkeypatch.setattr(ytdlp.yt_dlp, "YoutubeDL", FakeYoutubeDL)
+    for embed in (True, False):
+        ytdlp.download(
+            "https://example.com/song", tmp_path,
+            DownloadRequest(url="https://example.com/song", downloadMode="audio", embedThumbnail=embed),
+            lambda *_: None, lambda: False,
+        )
+
+    enabled, disabled = options_seen
+    assert enabled["writethumbnail"] is True
+    assert [pp["key"] for pp in enabled["postprocessors"]] == ["FFmpegExtractAudio", "EmbedThumbnail", "FFmpegMetadata"]
+    assert disabled["writethumbnail"] is False
+    assert [pp["key"] for pp in disabled["postprocessors"]] == ["FFmpegExtractAudio", "FFmpegMetadata"]
 
 
 def test_subtitles() -> None:
