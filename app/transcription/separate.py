@@ -1,16 +1,39 @@
 """Optional Demucs separation, invoked only after explicit installation."""
 import hashlib
 import importlib.util
+import os
 from pathlib import Path
 
 from app.config import settings
 from app.errors import AppError
 
 
+def model_marker() -> Path:
+    """Locate the explicit-download marker for the selected model."""
+    from app.engine.naming import sanitize
+    return settings.models_dir / ("demucs-" + sanitize(settings.demucs_model) + ".ready")
+
+
+def download_model() -> str:
+    """Download Demucs weights only when explicitly requested by the user."""
+    if importlib.util.find_spec("demucs") is None:
+        raise AppError("demucs.failed", "Install the optional demucs package before downloading its model.")
+    try:
+        os.environ["TORCH_HOME"] = str(settings.models_dir / "torch")
+        from demucs.pretrained import get_model
+        get_model(settings.demucs_model)
+        model_marker().parent.mkdir(parents=True, exist_ok=True)
+        model_marker().touch()
+        return settings.demucs_model
+    except Exception as exc:
+        raise AppError("demucs.failed", "Could not download the Demucs model: " + str(exc)[:200]) from exc
+
+
 def separate(source: Path, cache: Path) -> Path | None:
     """Return a cached vocal stem; return None if Demucs is not installed."""
-    if not settings.demucs_enabled or importlib.util.find_spec("demucs") is None:
+    if not settings.demucs_enabled or importlib.util.find_spec("demucs") is None or not model_marker().exists():
         return None
+    os.environ["TORCH_HOME"] = str(settings.models_dir / "torch")
     digest = hashlib.sha256()
     with source.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):

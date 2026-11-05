@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.engine.formats import build_plan
 from app.engine import ffmpeg
-from app.engine.naming import sanitize, unique
+from app.engine.naming import filename, sanitize, unique
 from app.engine.subtitles import vtt_to_srt
 from app.errors import CODES
 from app.schemas import DownloadRequest
@@ -36,6 +36,9 @@ def test_names(tmp_path: Path) -> None:
     first = tmp_path / "Song.mp3"
     first.touch()
     assert unique(first).name == "Song (1).mp3"
+    assert filename("classic", {"title": "Song", "uploader": "Artist", "id": "abc"}, "mp3") == "Artist - Song [abc].mp3"
+    assert filename("basic", {"title": "á" * 300}, "mp3").endswith(".mp3")
+    assert len(filename("basic", {"title": "á" * 300}, "mp3")) <= 180
 
 
 def test_merge_and_export(tmp_path: Path) -> None:

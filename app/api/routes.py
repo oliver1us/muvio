@@ -98,6 +98,9 @@ async def download(payload: DownloadRequest, request: Request) -> dict:
         return {"status": "picker", "picker": data["entries"]}
     if data["is_live"]:
         raise AppError("media.live", "Live streams are not supported.")
+    if payload.embedSubtitles or payload.downloadSubtitles:
+        if not any(track["lang"] == payload.subtitleLang and track["is_automatic"] == payload.subtitleAutomatic for track in data["subtitles"]):
+            raise AppError("format.unavailable", "The selected subtitle language and track type are not available.")
     if payload.downloadMode != "audio" and data["formats"]:
         from app.engine.formats import build_plan
         codec = {"h264": "avc1", "vp9": "vp9", "av1": "av01"}[payload.videoCodec]
@@ -292,4 +295,15 @@ async def model_download() -> dict:
         job.stage = "Downloading Whisper model"
         job.filename = await anyio.to_thread.run_sync(download_model)
     job = queue.submit("model", "Hugging Face", operation)
+    return {"status": "local-processing", "output": {"job_id": job.id}}
+
+
+@router.post("/models/demucs")
+async def demucs_model_download() -> dict:
+    """Explicit opt-in to downloading Demucs vocal-separation weights."""
+    from app.transcription.separate import download_model
+    async def operation(job: Job) -> None:
+        job.stage = "Downloading Demucs model"
+        job.filename = await anyio.to_thread.run_sync(download_model)
+    job = queue.submit("model", "Demucs", operation)
     return {"status": "local-processing", "output": {"job_id": job.id}}

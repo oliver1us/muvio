@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 import yt_dlp
 
 from app.engine.formats import build_plan
-from app.engine.naming import sanitize
+from app.engine.naming import filename, unique
 from app.errors import AppError
 from app.schemas import DownloadRequest
 
@@ -111,7 +111,7 @@ def download(url: str, folder: Path, request: DownloadRequest, progress: Callabl
     if request.downloadSubtitles or request.embedSubtitles:
         if not request.subtitleLang:
             raise AppError("format.unavailable", "Choose a subtitle language first.")
-        opts.update(writesubtitles=True, writeautomaticsub=True, subtitleslangs=[request.subtitleLang], subtitlesformat="vtt/srt/best")
+        opts.update(writesubtitles=not request.subtitleAutomatic, writeautomaticsub=request.subtitleAutomatic, subtitleslangs=[request.subtitleLang], subtitlesformat="vtt/srt/best")
         if request.embedSubtitles:
             opts["postprocessors"].append({"key": "FFmpegEmbedSubtitle"})
             opts["embedsubtitles"] = True
@@ -125,7 +125,15 @@ def download(url: str, folder: Path, request: DownloadRequest, progress: Callabl
     files = [p for p in folder.iterdir() if p.is_file() and p.suffix.lower() not in {".part", ".ytdl", ".jpg", ".png", ".webp", ".srt", ".vtt"}]
     if not files:
         raise AppError("file.not_found", "No output file was produced.")
-    return max(files, key=lambda p: p.stat().st_mtime)
+    result = max(files, key=lambda p: p.stat().st_mtime)
+    metadata = _cache.get(url, (0, {}))[1]
+    if metadata:
+        target = folder / filename(request.filenameStyle, metadata, result.suffix)
+        if result != target:
+            target = unique(target)
+            result.rename(target)
+            result = target
+    return result
 
 
 def download_subtitle(url: str, folder: Path, lang: str, automatic: bool, fmt: str) -> Path:

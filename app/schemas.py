@@ -15,6 +15,7 @@ class DownloadRequest(BaseModel):
     audioFormat: Literal["best", "mp3", "m4a", "opus", "ogg", "wav", "flac"] = "mp3"
     audioBitrate: Literal["320", "256", "128", "96", "64"] = "320"
     subtitleLang: str | None = None
+    subtitleAutomatic: bool = False
     downloadSubtitles: bool = False
     embedSubtitles: bool = False
     subtitleFormat: Literal["srt", "vtt"] = "srt"
