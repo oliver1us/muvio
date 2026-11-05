@@ -2,6 +2,13 @@
 import re
 
 
+def srt_to_vtt(text: str) -> str:
+    """Preserve SubRip cues while converting their timestamps to WebVTT."""
+    text = text.lstrip("\ufeff").replace("\r\n", "\n")
+    text = re.sub(r"(\d{2}:\d{2}:\d{2}),(\d{3})", r"\1.\2", text)
+    return "WEBVTT\n\n" + text.strip() + "\n"
+
+
 def vtt_to_srt(text: str) -> str:
     """Convert WebVTT timing cues to numbered SubRip cues."""
     cues = []

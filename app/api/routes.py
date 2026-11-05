@@ -48,7 +48,7 @@ async def download_operation(job: Job, payload: DownloadRequest) -> None:
         result = await anyio.to_thread.run_sync(ytdlp.download, payload.url, folder, payload, lambda p, s, e, stage: queue.update(job, p, s, e, stage), lambda: job.cancelled)
         if job.cancelled:
             raise AppError("job.cancelled", "The job was cancelled.")
-        conversion = build_plan(payload).audio_conversion
+        conversion = build_plan(payload).audio_conversion if payload.downloadMode == "audio" else None
         if conversion:
             queue.update(job, 99, None, None, "Converting audio")
             original = result
@@ -98,15 +98,16 @@ async def download(payload: DownloadRequest, request: Request) -> dict:
         return {"status": "picker", "picker": data["entries"]}
     if data["is_live"]:
         raise AppError("media.live", "Live streams are not supported.")
+    if payload.downloadMode == "auto" and not data["videoStreams"] and data["audioStreams"]:
+        payload = payload.model_copy(update={"downloadMode": "audio"})
+    if payload.downloadMode == "audio" and not data["audioStreams"]:
+        raise AppError("format.unavailable", "This source does not contain an audio track.")
     if payload.embedSubtitles or payload.downloadSubtitles:
         if not any(track["lang"] == payload.subtitleLang and track["is_automatic"] == payload.subtitleAutomatic for track in data["subtitles"]):
             raise AppError("format.unavailable", "The selected subtitle language and track type are not available.")
-    if payload.downloadMode != "audio" and data["formats"]:
+    if payload.downloadMode != "audio":
         from app.engine.formats import build_plan
-        codec = {"h264": "avc1", "vp9": "vp9", "av1": "av01"}[payload.videoCodec]
-        candidates = [f for f in data["videoStreams"] if (f.get("vcodec") or "").startswith(codec) and (payload.videoQuality == "max" or (f.get("height") or 0) <= int(payload.videoQuality))]
-        if not candidates:
-            raise AppError("format.unavailable", "The selected codec and quality are not available for this media.")
+        build_plan(payload, data["formats"])
     job = queue.submit("download", payload.url, lambda j: download_operation(j, payload))
     return {"status": "local-processing", "url": signed_url(request, job), "filename": None, "output": {"job_id": job.id}}
 
@@ -114,6 +115,9 @@ async def download(payload: DownloadRequest, request: Request) -> dict:
 @router.post("/subtitle-download")
 async def subtitle_download(payload: SubtitleRequest, request: Request) -> dict:
     """Queue a specific manual or automatic subtitle variant."""
+    data = await anyio.to_thread.run_sync(ytdlp.info, payload.url)
+    if not any(track["lang"] == payload.lang and track["is_automatic"] == payload.automatic for track in data["subtitles"]):
+        raise AppError("format.unavailable", "This subtitle track is not available. Choose another language or source track.")
     async def operation(job: Job) -> None:
         path = await anyio.to_thread.run_sync(ytdlp.download_subtitle, payload.url, settings.output_dir / job.id, payload.lang, payload.automatic, payload.format)
         job.output_path, job.filename = str(path), path.name

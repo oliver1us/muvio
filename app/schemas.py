@@ -9,9 +9,9 @@ class DownloadRequest(BaseModel):
 
     url: str
     downloadMode: Literal["auto", "audio", "video"] = "auto"
-    videoQuality: Literal["max", "2160", "1440", "1080", "720", "480", "360"] = "1080"
+    videoQuality: str = Field(default="auto", pattern=r"^(auto|max|[1-9][0-9]{0,4})$")
     videoContainer: Literal["auto", "mp4", "webm", "mkv"] = "auto"
-    videoCodec: Literal["h264", "vp9", "av1"] = "h264"
+    videoCodec: Literal["auto", "h264", "vp9", "av1"] = "auto"
     audioFormat: Literal["best", "mp3", "m4a", "opus", "ogg", "wav", "flac"] = "mp3"
     audioBitrate: Literal["320", "256", "128", "96", "64"] = "320"
     subtitleLang: str | None = None

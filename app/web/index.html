@@ -1,26 +1,109 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>muvio · media made simple</title><link rel="stylesheet" href="/css/app.css"></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b0d12">
+  <title>muvio · media made simple</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preload" href="/fonts/jost-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/css/custom.css">
+</head>
 <body>
-<header class="header"><a href="/" class="brand"><span class="mark">▶</span> muvio</a><button id="settingsButton" class="quiet" aria-label="Open settings">⚙ Settings</button></header>
-<main>
-<div class="intro"><span class="eyebrow">YOUR MEDIA, YOUR DEVICE</span><h1>Media made simple.</h1><p>Paste a public link. Choose a format. Keep the file.</p></div>
-<form id="fetchForm" class="url-row"><input id="url" type="url" placeholder="https://youtube.com/watch?v=..." required aria-label="Media URL"><button type="button" id="paste" class="quiet" title="Paste from clipboard">Paste</button><button type="submit" id="fetch">Fetch link <span aria-hidden="true">↗</span></button></form>
-<p class="services">YouTube · TikTok · X · Instagram · Reddit · SoundCloud · Vimeo · Facebook · Pinterest · Bluesky · Bilibili · more</p>
-<div id="message" role="alert" hidden></div>
-<section id="picker" class="card" hidden><h3>Choose an item</h3><p class="muted">This link contains multiple items. Select one to preview.</p><div id="pickerItems"></div></section>
-<section id="panel" hidden>
- <div class="preview"><img id="thumb" alt="Media thumbnail"><div><span class="eyebrow">READY TO DOWNLOAD</span><h2 id="title"></h2><p id="byline"></p></div></div>
- <div class="tabs"><button class="tab active" data-tab="video">Video</button><button class="tab" data-tab="audio">Audio</button></div>
- <div id="videoPanel" class="card"><label>Quality</label><div id="qualities" class="chips"></div><div class="fields"><label>Codec<select id="codec"><option value="h264">H.264</option><option value="vp9">VP9</option><option value="av1">AV1</option></select></label><label>Container<select id="container"><option value="auto">Auto</option><option value="mp4">MP4</option><option value="webm">WebM</option><option value="mkv">MKV</option></select></label></div><p id="embedHint" class="muted">Choose “Embed” beside a subtitle track to include it in the next video.</p><button class="primary" id="videoDownload">Download video ↓</button></div>
- <div id="audioPanel" class="card" hidden><label>Format</label><div id="audioFormats" class="chips"></div><div class="fields"><label>Bitrate<select id="bitrate"><option>320</option><option>256</option><option>128</option><option>96</option><option>64</option></select></label><label class="check"><input id="cover" type="checkbox" checked> Embed cover art</label></div><button class="primary" id="audioDownload">Download audio ↓</button></div>
- <div class="card"><h3>Subtitles</h3><p class="muted">Manual and auto-generated tracks from the source.</p><label>Download format<select id="subtitleFormat"><option value="srt">SRT</option><option value="vtt">VTT</option></select></label><div id="tracks"></div></div>
- <div class="card"><h3>Transcribe locally</h3><p class="muted">Generate your own word-timed transcript. No external transcription service.</p><div class="fields"><label>Mode<select id="mode"><option value="quick">Quick · speech</option><option value="studio">Studio · songs & talks</option></select></label><label>Language<select id="language"><option value="">Auto-detect</option><option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="ja">Japanese</option></select></label></div><div class="checks"><label class="check"><input type="checkbox" id="separate"> Separate vocals (Demucs)</label><label class="check"><input type="checkbox" id="focus"> Vocal focus</label><label class="check"><input type="checkbox" id="ai"> <span id="aiLabel">Send transcript to AI cleanup (optional)</span></label></div><button class="primary" id="transcribe">Transcribe link →</button></div>
-</section>
-<section class="card upload"><h3>Have a file already?</h3><p class="muted">Transcribe audio or video from your device. Files stay on this server.</p><input type="file" id="upload" accept="audio/*,video/*"><button id="uploadButton">Transcribe file →</button></section>
-<section class="history"><div class="section-title"><h3>Activity</h3><button id="refresh" class="quiet">Refresh ↻</button></div><div id="jobs" class="job-list"><p class="muted">No jobs yet.</p></div></section>
-<footer>Self-hosted. No ads, accounts, or tracking. Respect creators and copyright.</footer>
-</main>
-<div id="overlay" hidden></div><aside id="drawer" hidden><div class="section-title"><h2>Settings</h2><button id="closeSettings" class="quiet">Close ✕</button></div><p class="muted">Preferences are saved on this server. Changes to worker count take effect after restart.</p><label>API key (for protected servers)<input type="password" id="authKey" autocomplete="off"></label><label>Whisper model<input id="whisperModel" value="large-v3-turbo"></label><button id="modelDownload">Download Whisper model now</button><label class="check"><input id="demucs" type="checkbox"> Enable Demucs vocal separation</label><button id="demucsDownload">Download Demucs model now</button><hr><h3>Optional AI cleanup</h3><label class="check"><input id="llmEnabled" type="checkbox"> Enable cleanup</label><label>Provider<select id="llmProvider"><option value="openai-compatible">OpenAI-compatible</option><option value="anthropic">Anthropic</option><option value="ollama">Ollama (local)</option></select></label><label>Endpoint<input id="llmBase" placeholder="http://localhost:11434"></label><label>Model<input id="llmModel"></label><label>API key<input id="llmKey" type="password" placeholder="Leave empty to keep existing key"></label><button class="primary" id="saveSettings">Save settings</button><p class="muted">Only use media you have permission to save. Muvio does not bypass DRM or private access.</p></aside>
-<script type="module" src="/js/main.js"></script>
-</body></html>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="header">
+    <a href="/" class="brand" aria-label="Muvio home"><span class="mark" aria-hidden="true">▶</span> muvio<span class="brand-dot">.</span></a>
+    <div class="header-actions">
+      <div class="activity-control">
+        <button id="activityButton" class="quiet activity-button" type="button" aria-controls="activityPanel" aria-expanded="false" aria-label="Activity"><span aria-hidden="true">↓</span> Activity<span id="activityCount" class="activity-count" hidden></span><span id="activityProgress" class="activity-progress" hidden></span></button>
+        <div id="activityToast" class="activity-toast" hidden>
+          <span class="toast-check" aria-hidden="true">✓</span><div><p id="toastText" role="status" aria-live="polite" aria-atomic="true"></p><button id="toastActivity" class="text-button" type="button">View activity <span aria-hidden="true">↗</span></button></div><button id="dismissToast" class="quiet" type="button" aria-label="Dismiss notification">×</button>
+        </div>
+        <section id="activityPanel" class="activity-panel" aria-label="Activity" hidden>
+          <div class="section-title"><div><span class="eyebrow">YOUR FILES</span><h2>Activity</h2></div><button id="refresh" class="quiet" type="button">Refresh <span aria-hidden="true">↻</span></button></div>
+          <p class="muted activity-help">When a file is ready, save it to your device here.</p>
+          <div id="jobs" class="job-list"><p class="empty-state">Your downloads will appear here.</p></div>
+        </section>
+      </div>
+      <button id="settingsButton" class="quiet settings-button" type="button" aria-label="Open settings"><span aria-hidden="true">⚙</span><span class="settings-label"> Settings</span></button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="intro" aria-labelledby="introTitle">
+      <span class="eyebrow"><span class="status-dot" aria-hidden="true"></span> YOUR MEDIA, YOUR DEVICE</span>
+      <h1 id="introTitle">A link. A file.<br><span>That simple.</span></h1>
+      <p>Save a video, keep the audio, or grab the subtitles.<br class="desktop-break"> Just paste a public link to get started.</p>
+    </section>
+    <form id="fetchForm" class="url-row">
+      <label class="sr-only" for="url">Public media link</label>
+      <input id="url" name="url" type="url" placeholder="Paste a link, e.g. https://youtube.com/watch?v=…" required autocomplete="off" spellcheck="false" aria-describedby="urlHelp">
+      <button type="button" id="paste" class="quiet" title="Paste from clipboard">Paste</button>
+      <button type="submit" id="fetch">Find media <span aria-hidden="true">↗</span></button>
+    </form>
+    <p id="urlHelp" class="services">YouTube, Instagram, TikTok, SoundCloud <span>& many more.</span></p>
+    <div id="message" role="alert" tabindex="-1" hidden></div>
+
+    <section id="picker" class="card" aria-labelledby="pickerTitle" hidden>
+      <h2 id="pickerTitle">Choose an item</h2><p class="muted">This link contains more than one item. Pick the one you want to save.</p><div id="pickerItems" class="picker-list"></div>
+    </section>
+
+    <section id="panel" aria-label="Media download options" hidden>
+      <div class="preview">
+        <img id="thumb" alt="Media thumbnail" width="192" height="108">
+        <div class="preview-copy"><span class="eyebrow">FOUND IT</span><h2 id="title"></h2><p id="byline"></p></div>
+        <span class="ready-badge"><span class="status-dot" aria-hidden="true"></span> Ready</span>
+      </div>
+      <div class="tabs" role="tablist" aria-label="What would you like to save?">
+        <button id="videoTab" class="tab active" role="tab" type="button" data-tab="video" aria-selected="true" aria-controls="videoPanel">Video</button>
+        <button id="audioTab" class="tab" role="tab" type="button" data-tab="audio" aria-selected="false" aria-controls="audioPanel" tabindex="-1">Audio</button>
+        <button id="subtitlesTab" class="tab" role="tab" type="button" data-tab="subtitles" aria-selected="false" aria-controls="subtitlesPanel" tabindex="-1">Subtitles</button>
+      </div>
+
+      <section id="videoPanel" class="card download-card" role="tabpanel" aria-labelledby="videoTab" tabindex="0">
+        <div class="download-heading"><span class="format-icon" aria-hidden="true">▷</span><div><h3>Keep the whole picture.</h3><p id="videoTagline" class="muted">A ready-to-play video, with sound.</p></div></div>
+        <div class="selection-summary"><div><span class="selection-label">YOUR DOWNLOAD</span><p id="videoSummary">Automatic</p><span id="videoDescription" class="muted">A good balance of quality and file size.</span></div><span id="videoBadge" class="recommendation">Recommended</span></div>
+        <p id="videoWarning" class="inline-notice" role="status" hidden></p>
+        <button class="primary download-button" id="videoDownload" type="button">Download video <span aria-hidden="true">↓</span></button>
+        <details id="videoAdvanced" class="advanced">
+          <summary>Advanced options <span class="advanced-chevron" aria-hidden="true">⌄</span></summary>
+          <p class="muted">Only combinations available for this link are enabled. No video re-encoding.</p>
+          <div class="fields"><label for="quality">Resolution<select id="quality"><option value="auto">Automatic · up to 720p</option><option value="max">Highest available</option></select></label><label for="container">File format<select id="container"><option value="auto">Automatic</option><option value="mp4">MP4 · widely compatible</option><option value="webm">WebM · modern players</option><option value="mkv">MKV · flexible</option></select></label><label for="codec">Video codec<select id="codec"><option value="auto">Automatic</option><option value="h264">H.264 · widely compatible</option><option value="vp9">VP9 · efficient</option><option value="av1">AV1 · newer devices</option></select></label><label for="embedSubtitle">Include subtitles<select id="embedSubtitle"><option value="">None</option></select></label></div>
+          <p id="videoTechnical" class="technical"></p>
+          <button id="resetVideo" class="text-button" type="button">Reset to automatic</button>
+        </details>
+      </section>
+
+      <section id="audioPanel" class="card download-card" role="tabpanel" aria-labelledby="audioTab" tabindex="0" hidden>
+        <div class="download-heading"><span class="format-icon" aria-hidden="true">♫</span><div><h3>Just the sound.</h3><p class="muted">Music, podcasts, and everything worth listening to.</p></div></div>
+        <div class="selection-summary"><div><span class="selection-label">YOUR DOWNLOAD</span><p id="audioSummary">Automatic (MP3)</p><span id="audioDescription" class="muted">High-quality audio. Easy to play and share.</span></div><span class="recommendation" id="audioBadge">Recommended</span></div>
+        <button class="primary download-button" id="audioDownload" type="button">Download audio <span aria-hidden="true">↓</span></button>
+        <details class="advanced"><summary>Advanced options <span class="advanced-chevron" aria-hidden="true">⌄</span></summary><div class="fields"><label for="audioFormat">Audio format<select id="audioFormat"><option value="mp3">Automatic (MP3)</option><option value="best">Original audio · no conversion</option><option value="m4a">M4A (AAC)</option><option value="opus">Opus</option><option value="ogg">OGG (Vorbis)</option><option value="wav">WAV</option><option value="flac">FLAC</option></select></label><label for="bitrate">Bitrate<select id="bitrate"><option value="320">320 kbps · high quality</option><option value="256">256 kbps</option><option value="128">128 kbps</option><option value="96">96 kbps</option><option value="64">64 kbps</option></select></label></div><label class="check"><input id="cover" type="checkbox" checked> Include cover art when available</label><p id="audioHint" class="muted advanced-note">A higher output bitrate does not restore quality missing from the source.</p></details>
+      </section>
+
+      <section id="subtitlesPanel" class="card download-card" role="tabpanel" aria-labelledby="subtitlesTab" tabindex="0" hidden>
+        <div class="download-heading"><span class="format-icon text-icon" aria-hidden="true">CC</span><div><h3>Every word, saved.</h3><p class="muted">Subtitles from the original source.</p></div></div>
+        <div id="subtitleControls"><label id="subtitleSearchLabel" for="subtitleSearch" hidden>Find a language<input id="subtitleSearch" type="search" name="subtitleSearch" placeholder="Search languages…" autocomplete="off"></label><label for="subtitleTrack">Subtitle language<select id="subtitleTrack"></select></label><p id="subtitleInfo" class="muted subtitle-info"></p><button class="primary download-button" id="subtitleDownload" type="button">Download subtitles <span aria-hidden="true">↓</span></button></div>
+        <p id="noSubtitles" class="empty-state" hidden>No subtitles were found. You can generate a transcript below.</p>
+        <details class="advanced"><summary>Advanced options <span class="advanced-chevron" aria-hidden="true">⌄</span></summary><label for="subtitleFormat">Subtitle format<select id="subtitleFormat"><option value="srt">SRT · widely compatible</option><option value="vtt">VTT · for the web</option></select></label><button id="embedSelected" class="text-button" type="button">Include this track in the video <span aria-hidden="true">↗</span></button></details>
+        <details id="transcriptionOptions" class="secondary-feature"><summary><span>Need your own transcript?<small>Generate one locally from this link.</small></span><span aria-hidden="true">+</span></summary><div class="secondary-content"><p class="muted">Requires a Whisper model. Download it in Settings first. Transcription runs on this server.</p><div class="fields"><label for="mode">Mode<select id="mode"><option value="quick">Quick · speech</option><option value="studio">Studio · songs & talks</option></select></label><label for="language">Language<select id="language"><option value="">Auto-detect</option><option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="ja">Japanese</option></select></label></div><div class="checks"><label class="check"><input type="checkbox" id="separate"> Separate vocals (Demucs)</label><label class="check"><input type="checkbox" id="focus"> Vocal focus</label><label class="check"><input type="checkbox" id="ai"> <span id="aiLabel">Send transcript to optional AI cleanup</span></label></div><button id="transcribe" type="button">Generate transcript <span aria-hidden="true">→</span></button></div></details>
+      </section>
+    </section>
+
+    <details class="upload secondary-feature"><summary><span>Already have a file?<small>Transcribe audio or video from your device.</small></span><span aria-hidden="true">+</span></summary><div class="secondary-content"><p class="muted">Processed on this server. Requires a local Whisper model, available in Settings.</p><label for="upload">Choose an audio or video file<input type="file" id="upload" name="upload" accept="audio/*,video/*"></label><p class="muted">Uses the transcription options in the Subtitles tab, or their defaults.</p><button id="uploadButton" type="button">Transcribe file <span aria-hidden="true">→</span></button></div></details>
+    <footer><span class="footer-brand">muvio.</span><p>No ads. No accounts. No tracking.<br>Only save media you have permission to download.</p><span class="footer-note">Less noise. More yours.</span></footer>
+  </main>
+
+  <div id="overlay" hidden></div>
+  <aside id="drawer" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" tabindex="-1" hidden>
+    <div class="section-title"><h2 id="settingsTitle">Settings</h2><button id="closeSettings" class="quiet" type="button" aria-label="Close settings">Close <span aria-hidden="true">×</span></button></div>
+    <p class="muted">Preferences are saved on this server. Worker changes take effect after restart.</p>
+    <p id="settingsMessage" role="alert" hidden></p>
+    <label for="authKey">Server API key<input type="password" id="authKey" autocomplete="off"></label>
+    <h3>Local transcription</h3><label for="whisperModel">Whisper model<input id="whisperModel" value="large-v3-turbo" autocomplete="off" spellcheck="false"></label><button id="modelDownload" type="button">Download Whisper model</button>
+    <label class="check"><input id="demucs" type="checkbox"> Enable Demucs vocal separation</label><button id="demucsDownload" type="button">Download Demucs model</button>
+    <hr><h3>Optional AI cleanup</h3><p class="muted">When selected, transcript text is sent to your configured provider.</p><label class="check"><input id="llmEnabled" type="checkbox"> Enable cleanup</label><label for="llmProvider">Provider<select id="llmProvider"><option value="openai-compatible">OpenAI-compatible</option><option value="anthropic">Anthropic</option><option value="ollama">Ollama (local)</option></select></label><label for="llmBase">Endpoint<input id="llmBase" type="url" placeholder="http://localhost:11434…" autocomplete="off" spellcheck="false"></label><label for="llmModel">Model<input id="llmModel" autocomplete="off" spellcheck="false"></label><label for="llmKey">Provider API key<input id="llmKey" type="password" autocomplete="new-password" placeholder="Leave empty to keep the existing key…"></label><button class="primary" id="saveSettings" type="button">Save settings</button><p class="muted">Muvio does not bypass DRM or private access.</p>
+  </aside>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

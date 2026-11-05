@@ -98,6 +98,19 @@ def test_error_taxonomy_and_health() -> None:
         assert client.get("/api/settings").status_code == 200
 
 
+def test_header_activity_and_favicon() -> None:
+    """The activity popover and favicon are served with the static UI."""
+    with TestClient(app) as client:
+        page = client.get("/").text
+        assert 'id="activityButton"' in page
+        assert 'id="activityPanel"' in page
+        assert 'class="history"' not in page
+        assert 'rel="icon" type="image/svg+xml" href="/favicon.svg"' in page
+        icon = client.get("/favicon.svg")
+        assert icon.status_code == 200
+        assert '<svg ' in icon.text
+
+
 def test_literal_values() -> None:
     """Invalid codec selections are rejected during request parsing."""
     from pydantic import ValidationError

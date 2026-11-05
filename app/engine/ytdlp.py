@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 
 import yt_dlp
 
-from app.engine.formats import build_plan
+from app.engine.formats import build_plan, video_options
 from app.engine.naming import filename, unique
 from app.errors import AppError
 from app.schemas import DownloadRequest
@@ -85,6 +85,8 @@ def info(url: str) -> dict:
     formats = [{"format_id": f.get("format_id"), "ext": f.get("ext"), "resolution": f.get("resolution"), "height": f.get("height"), "fps": f.get("fps"), "vcodec": f.get("vcodec"), "acodec": f.get("acodec"), "filesize": f.get("filesize"), "filesize_approx": f.get("filesize_approx"), "abr": f.get("abr"), "vbr": f.get("vbr"), "tbr": f.get("tbr"), "note": f.get("format_note"), "has_audio": f.get("acodec") not in (None, "none"), "has_video": f.get("vcodec") not in (None, "none")} for f in raw.get("formats") or []]
     data = {k: raw.get(k) for k in ("title", "uploader", "duration", "thumbnail", "webpage_url", "extractor", "is_live", "id")}
     data.update(formats=formats, subtitles=tracks(raw), entries=entries, audioStreams=[f for f in formats if f["has_audio"]], videoStreams=[f for f in formats if f["has_video"]])
+    combinations = video_options(formats)
+    data["videoOptions"] = [dict(codec=codec, container=container, height=height) for codec, container, height in sorted({(o["codec"], o["container"], o["height"]) for o in combinations})]
     _cache[url] = (time.time(), data)
     return data
 
@@ -93,7 +95,7 @@ def download(url: str, folder: Path, request: DownloadRequest, progress: Callabl
     """Download to a job-owned folder; capture the actual postprocessed file."""
     validate_url(url)
     folder.mkdir(parents=True, exist_ok=True)
-    plan = build_plan(request)
+    plan = build_plan(request, info(url)["formats"] if request.downloadMode != "audio" else None)
     def hook(data: dict) -> None:
         if cancelled():
             raise AppError("job.cancelled", "The job was cancelled.")
@@ -103,6 +105,7 @@ def download(url: str, folder: Path, request: DownloadRequest, progress: Callabl
     opts = options() | {"format": plan.selector, "outtmpl": str(folder / "%(title).150s [%(id)s].%(ext)s"), "progress_hooks": [hook], "postprocessors": list(plan.postprocessors), "writethumbnail": request.embedThumbnail and request.downloadMode == "audio" and request.audioFormat not in {"best", "wav", "flac", "opus", "ogg"}, "retries": 5, "fragment_retries": 5, "socket_timeout": 20, "overwrites": False}
     if plan.container:
         opts["merge_output_format"] = plan.container
+        opts["postprocessors"].append({"key": "FFmpegVideoRemuxer", "preferedformat": plan.container})
     if opts["writethumbnail"]:
         if request.audioFormat != "m4a":
             opts["postprocessors"].append({"key": "EmbedThumbnail"})
@@ -140,7 +143,7 @@ def download_subtitle(url: str, folder: Path, lang: str, automatic: bool, fmt: s
     """Download one subtitle track through yt-dlp."""
     validate_url(url)
     folder.mkdir(parents=True, exist_ok=True)
-    opts = options() | {"skip_download": True, "writesubtitles": not automatic, "writeautomaticsub": automatic, "subtitleslangs": [lang], "subtitlesformat": "vtt/srt/best", "outtmpl": str(folder / "%(title).150s.%(ext)s")}
+    opts = options() | {"skip_download": True, "writesubtitles": not automatic, "writeautomaticsub": automatic, "subtitleslangs": [lang], "subtitlesformat": f"{fmt}/vtt/srt/best", "outtmpl": str(folder / "%(title).150s.%(ext)s")}
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             ydl.download([url])
@@ -154,5 +157,10 @@ def download_subtitle(url: str, folder: Path, lang: str, automatic: bool, fmt: s
         from app.engine.subtitles import vtt_to_srt
         target = source.with_suffix(".srt")
         target.write_text(vtt_to_srt(source.read_text(encoding="utf-8")), encoding="utf-8")
+        return target
+    if fmt == "vtt" and source.suffix == ".srt":
+        from app.engine.subtitles import srt_to_vtt
+        target = source.with_suffix(".vtt")
+        target.write_text(srt_to_vtt(source.read_text(encoding="utf-8")), encoding="utf-8")
         return target
     return source
