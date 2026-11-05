@@ -11,6 +11,8 @@ from app.engine.subtitles import vtt_to_srt
 from app.errors import CODES
 from app.schemas import DownloadRequest
 from app.transcription.studio import export, merge
+from app.transcription import engine
+from app.errors import AppError
 from main import app
 
 
@@ -85,3 +87,17 @@ def test_ffmpeg_audio_conversion(tmp_path: Path) -> None:
         info = await ffmpeg.probe(output)
         assert info["streams"][0]["codec_name"] == "aac"
     asyncio.run(verify())
+
+
+def test_missing_whisper_model_is_explicit(monkeypatch, tmp_path: Path) -> None:
+    """Missing local models cannot silently initiate a network download."""
+    from app.config import settings
+    monkeypatch.setattr(settings, "models_dir", tmp_path)
+    monkeypatch.setattr(settings, "whisper_model", "large-v3-turbo")
+    monkeypatch.setattr(engine, "_model", None)
+    try:
+        engine.transcribe(tmp_path / "audio.wav")
+    except AppError as exc:
+        assert exc.code == "whisper.model_missing"
+    else:
+        raise AssertionError("Missing Whisper model accepted")

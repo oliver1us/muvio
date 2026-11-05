@@ -42,6 +42,7 @@ def transcribe(path: Path, language: str | None = None, studio: bool = False, pr
         except AppError:
             raise
         except Exception as exc:
-            if "not found" in str(exc).lower() or "offline" in str(exc).lower():
+            reason = str(exc).lower()
+            if any(needle in reason for needle in ("not found", "cannot find", "offline", "local_files_only", "cached snapshot")):
                 raise AppError("whisper.model_missing", "Download the Whisper model explicitly in Settings before transcribing.") from exc
             raise AppError("whisper.failed", "Transcription failed: " + str(exc)[:250]) from exc

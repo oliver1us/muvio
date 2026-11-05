@@ -21,6 +21,7 @@ function renderPicker(items) {
 }
 function renderInfo(data) {
   current = data; embedTrack = null; $('embedHint').textContent = 'Choose “Embed” beside a subtitle track to include it in the next video.'; $('panel').hidden = false; $('title').textContent = data.title || 'Untitled media'; $('byline').textContent = [data.uploader, data.duration ? `${Math.floor(data.duration / 60)}:${String(Math.floor(data.duration % 60)).padStart(2,'0')}` : ''].filter(Boolean).join(' · ');
+  $('aiLabel').textContent = `Send transcript to AI cleanup · roughly ${Math.ceil((data.duration || 60) * 3)} tokens (explicit opt-in)`;
   $('thumb').src = data.thumbnail || ''; $('thumb').hidden = !data.thumbnail;
   const video = data.videoStreams || []; const max = Math.max(0, ...video.map(f => f.height || 0));
   chips('qualities', [['max','Max'],...['2160','1440','1080','720','480','360'].filter(q => max >= +q).map(q => [q, q + 'p'])], max >= 1080 ? '1080' : 'max');

@@ -1,4 +1,6 @@
 """Opt-in transcript correction with strict line preservation."""
+import re
+
 import httpx
 
 from app.config import settings
@@ -31,4 +33,7 @@ async def cleanup(lines: list[str], title: str, artist: str) -> tuple[list[str],
     corrected = result.strip().splitlines()
     if len(corrected) != len(lines):
         return lines, "llm.line_count_mismatch: Provider changed the line count; original retained."
+    markers = re.compile(r"\[\d{2}:\d{2}(?:\.\d{3})?\]")
+    if any(markers.findall(original) != markers.findall(updated) for original, updated in zip(lines, corrected)):
+        return lines, "llm.failed: Provider changed timing markers; original retained."
     return corrected, None
