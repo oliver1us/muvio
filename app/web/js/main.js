@@ -1,5 +1,6 @@
 // Dependency-free frontend for the Muvio JSON API.
 import { chooseVideo, matchingVideo, codecLabels, containerLabels, groupSubtitles, subtitleLabel, audioTrackLabel } from './media.mjs';
+import { autoSaveTracker, retentionLabel } from './activity.mjs';
 
 const $ = id => document.getElementById(id);
 const number = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
@@ -15,6 +16,20 @@ let eventStream;
 let eventTimer;
 let jobLimit = 30;
 let settingsFocus;
+let session;
+let bootstrap;
+let nextCursor = null;
+const autoSave = autoSaveTracker(sessionStorage);
+let pendingKeys;
+try { pendingKeys = JSON.parse(sessionStorage.getItem('muvio-pending-keys') || '{}'); } catch { pendingKeys = {}; }
+if (!pendingKeys || typeof pendingKeys !== 'object' || Array.isArray(pendingKeys)) pendingKeys = {};
+
+function boundedJobs(items) {
+  const seen = new Set();
+  const unique = items.filter(job => { if (seen.has(job.id)) return false; seen.add(job.id); return true; });
+  // Keep recent activity plus a sliding window of older pages, not all history.
+  return unique.length > 200 ? [...unique.slice(0, 30), ...unique.slice(-170)] : unique;
+}
 const completedLinks = new Map();
 
 function show(text) {
@@ -39,10 +54,24 @@ function notify(text, withActivity = true) {
 }
 
 async function api(path, options = {}) {
+  if (path !== '/session' && bootstrap) await bootstrap;
   const key = localStorage.getItem('muvio-api-key');
+  const write = ['POST', 'PUT', 'DELETE'].includes(options.method);
+  const contentKey = options.body instanceof FormData
+    ? JSON.stringify([...options.body].map(([name, value]) => [name, value instanceof File ? [value.name, value.size, value.lastModified] : value]))
+    : options.body || '';
+  const signature = options.method === 'POST' && ['/download', '/subtitle-download', '/transcribe', '/models/whisper', '/models/demucs'].includes(path)
+    ? path + contentKey : null;
+  if (signature && !pendingKeys[signature]) {
+    if (Object.keys(pendingKeys).length >= 64) delete pendingKeys[Object.keys(pendingKeys)[0]];
+    pendingKeys[signature] = crypto.randomUUID();
+    try { sessionStorage.setItem('muvio-pending-keys', JSON.stringify(pendingKeys)); } catch { /* private mode */ }
+  }
   const headers = {
     ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
     ...(key ? { Authorization: `Api-Key ${key}` } : {}),
+    ...(write ? { 'X-Muvio-Request': '1' } : {}),
+    ...(signature ? { 'Idempotency-Key': pendingKeys[signature] } : {}),
   };
   let response;
   try { response = await fetch('/api' + path, { ...options, headers: { ...headers, ...options.headers } }); }
@@ -51,9 +80,47 @@ async function api(path, options = {}) {
   try { result = await response.json(); }
   catch { throw new Error('The server returned an unreadable response. Please try again.'); }
   if (!response.ok || result.status === 'error') {
-    throw new Error(result.error?.context?.message || 'The request failed. Please try again.');
+    const context = result.error?.context || {};
+    if (context.remaining !== undefined && session) { session.quota = context; renderSession(); }
+    throw new Error((context.message || 'The request failed. Please try again.')
+      + (context.next_available_at ? ` Try again after ${new Date(context.next_available_at * 1000).toLocaleString()}.` : ''));
+  }
+  if (signature) {
+    delete pendingKeys[signature];
+    try { sessionStorage.setItem('muvio-pending-keys', JSON.stringify(pendingKeys)); } catch { /* private mode */ }
   }
   return result;
+}
+
+function renderSession() {
+  if (!session) return;
+  const quota = session.quota || {};
+  $('sessionStatus').textContent = `${session.administrator ? 'Administrator · private browser session' : 'Anonymous session'} · ${quota.remaining === null ? 'Unlimited' : `${quota.remaining ?? '…'} of ${quota.limit ?? '…'} downloads remaining`}`
+    + (quota.next_available_at ? ` · Next slot ${new Date(quota.next_available_at * 1000).toLocaleString()}` : '');
+  $('adminSettings').hidden = !session.administrator;
+  $('saveSettings').hidden = !session.administrator;
+  $('transcriptionOptions').hidden = !session.administrator;
+  $('uploadOptions').hidden = !session.administrator;
+}
+
+async function loadSession() {
+  session = await api('/session');
+  renderSession();
+}
+
+async function attemptSave(job) {
+  if (!autoSave.claim(job)) return;
+  try {
+    const detail = await api('/jobs/' + job.id);
+    if (detail.availability !== 'available' || !detail.url) return;
+    const link = document.createElement('a');
+    link.href = detail.url;
+    link.download = detail.filename || '';
+    document.body.append(link);
+    link.click();
+    link.remove();
+    notify('Automatic save requested. If blocked by your browser, use Activity → Save file.');
+  } catch { notify('Automatic save unavailable. Use the manual Save file button in Activity.'); }
 }
 
 async function busy(button, action) {
@@ -293,8 +360,15 @@ function renderJobs() {
     const status = document.createElement('p');
     status.className = `job-status ${job.status}`;
     const percent = `${number.format(Math.round(job.percent || 0))}%`;
-    status.textContent = ({ queued: 'In queue', running: `${job.stage || 'Preparing'} · ${percent}`, done: job.kind === 'model' ? 'Model installed' : 'Ready to save', error: 'Could not finish', cancelled: 'Cancelled' })[job.status] || job.status;
+    status.textContent = ({ receiving: 'Receiving upload', queued: 'In queue', running: `${job.stage || 'Preparing'} · ${percent}`, done: job.kind === 'model' ? 'Model installed' : job.availability === 'expired' ? 'Expired' : job.availability === 'missing' ? 'Not available' : 'Ready to save', error: 'Could not finish', cancelled: 'Cancelled' })[job.status] || job.status;
     details.append(name, status);
+    const retention = retentionLabel(job);
+    if (retention) {
+      const label = document.createElement('p');
+      label.className = 'muted';
+      label.textContent = retention;
+      details.append(label);
+    }
     if (job.status === 'running') {
       const bar = document.createElement('progress');
       bar.value = job.percent || 0;
@@ -321,16 +395,21 @@ function renderJobs() {
     }
     const actions = document.createElement('div');
     actions.className = 'job-actions';
-    if (job.status === 'done' && job.kind !== 'model') {
+    if (job.status === 'done' && job.kind !== 'model' && !['expired', 'missing'].includes(job.availability)) {
       let cached = completedLinks.get(job.id);
       if (!cached || cached.expires < Date.now()) {
         cached = { expires: Date.now() + 5 * 60 * 1000 };
         completedLinks.set(job.id, cached);
-        api('/jobs/' + job.id).then(detail => { cached.detail = detail; renderJobs(); })
+        api('/jobs/' + job.id).then(detail => {
+          cached.detail = detail;
+          for (const current of jobs) if (current.id === job.id && detail.availability) current.availability = detail.availability;
+          renderJobs();
+        })
           .catch(error => { cached.error = error.message; renderJobs(); });
       }
       if (cached.detail) {
         const downloads = cached.detail.downloads || {};
+        if (Object.keys(downloads).length && cached.detail.kind === 'download' && cached.detail.url) downloads.download = cached.detail.url;
         for (const [ext, url] of Object.entries(Object.keys(downloads).length ? downloads : { download: cached.detail.url })) {
           if (!url) continue;
           const link = document.createElement('a');
@@ -361,12 +440,18 @@ function renderJobs() {
     row.append(details, actions);
     list.append(row);
   }
-  if (jobs.length > jobLimit) {
+  if (nextCursor !== null) {
     const more = document.createElement('button');
     more.type = 'button';
     more.className = 'text-button';
     more.textContent = 'Show older activity';
-    more.onclick = () => { jobLimit += 30; renderJobs(); };
+    more.onclick = () => busy(more, async () => {
+      const page = await api('/jobs?limit=30&cursor=' + encodeURIComponent(nextCursor));
+      jobs = boundedJobs([...jobs, ...page.items]);
+      nextCursor = page.next_cursor;
+      jobLimit = Math.min(200, jobLimit + 30);
+      renderJobs();
+    });
     list.append(more);
   }
   if (focusId) [...list.querySelectorAll('[data-action-id]')].find(node => node.dataset.actionId === focusId)?.focus({ preventScroll: true });
@@ -375,11 +460,27 @@ function renderJobs() {
 async function refresh() {
   const version = ++refreshVersion;
   let updated;
-  try { updated = await api('/jobs'); }
+  try { updated = await api('/jobs?limit=30'); }
   catch (error) { if (version === refreshVersion && !$('activityPanel').hidden) show(error.message); return; }
   if (version !== refreshVersion) return;
   const previous = new Map(jobs.map(job => [job.id, job.status]));
-  jobs = updated;
+  jobs = jobLimit > 30 ? boundedJobs([...updated.items, ...jobs]) : updated.items;
+  if (jobLimit === 30) nextCursor = updated.next_cursor;
+  for (const job of jobs) {
+    if (job.storage_mode === 'temporary' && job.expires_at && Date.parse(job.expires_at) <= Date.now()) job.availability = 'expired';
+    if (['expired', 'missing'].includes(job.availability)) completedLinks.delete(job.id);
+    void attemptSave(job);
+  }
+  const watched = new Set([...autoSave.pending(), ...jobs.filter(job => ['queued', 'running'].includes(job.status)).map(job => job.id)]);
+  for (const id of watched) {
+    if (!updated.items.some(job => job.id === id)) api('/jobs/' + id).then(detail => {
+      const index = jobs.findIndex(job => job.id === id);
+      if (index !== -1) jobs[index] = detail;
+      void attemptSave(detail);
+      renderJobs();
+    }).catch(() => {});
+  }
+  for (const id of completedLinks.keys()) if (!jobs.some(job => job.id === id)) completedLinks.delete(id);
   if (jobs.some(job => job.status === 'done' && ['running', 'queued'].includes(previous.get(job.id)))) {
     notify(jobs.some(job => job.status === 'done' && job.kind !== 'model' && ['running', 'queued'].includes(previous.get(job.id))) ? 'Your file is ready to save.' : 'Your model is installed.');
   }
@@ -391,6 +492,7 @@ async function refresh() {
   $('activityProgress').textContent = running ? `${number.format(Math.round(running.percent || 0))}%` : 'Queued';
   $('activityButton').setAttribute('aria-label', active.length ? `Activity, ${active.length} active, ${$('activityProgress').textContent}` : 'Activity');
   renderJobs();
+  loadSession().catch(() => {});
 }
 
 function activity(state) {
@@ -416,6 +518,7 @@ function startUpdates() {
   eventTimer = null;
   eventStream?.close();
   const poll = () => { eventStream?.close(); clearInterval(pollTimer); pollTimer = setInterval(refresh, 2500); };
+  pollTimer = setInterval(refresh, 10000);
   if (localStorage.getItem('muvio-api-key')) { poll(); return; }
   try {
     eventStream = new EventSource('/api/events');
@@ -465,13 +568,15 @@ for (const mode of ['video', 'audio']) $(mode + 'Download').onclick = () => busy
   };
   const result = await api('/download', { method: 'POST', body: JSON.stringify(payload) });
   if (result.status === 'picker') { renderPicker(result.picker); return; }
+  autoSave.start(result.output?.job_id);
   notify(`${mode === 'video' ? 'Video' : 'Audio'} download added to Activity.`);
   await refresh();
 });
 $('subtitleDownload').onclick = () => busy($('subtitleDownload'), async () => {
   const track = selectedTrack();
   if (!track) return;
-  await api('/subtitle-download', { method: 'POST', body: JSON.stringify({ url: currentUrl, lang: track.lang, automatic: track.is_automatic, format: $('subtitleFormat').value }) });
+  const result = await api('/subtitle-download', { method: 'POST', body: JSON.stringify({ url: currentUrl, lang: track.lang, automatic: track.is_automatic, format: $('subtitleFormat').value }) });
+  autoSave.start(result.output?.job_id);
   notify('Subtitle download added to Activity.');
   await refresh();
 });
@@ -490,7 +595,7 @@ $('uploadButton').onclick = () => busy($('uploadButton'), async () => {
   notify('File transcription added to Activity.');
   await refresh();
 });
-$('refresh').onclick = () => { for (const [id, cached] of completedLinks) if (cached.error) completedLinks.delete(id); refresh(); };
+$('refresh').onclick = () => { jobLimit = 30; for (const [id, cached] of completedLinks) if (cached.error) completedLinks.delete(id); refresh(); };
 $('activityButton').onclick = () => activity($('activityPanel').hidden);
 $('toastActivity').onclick = () => { activity(true); $('activityButton').focus(); };
 $('dismissToast').onclick = dismissToast;
@@ -504,7 +609,7 @@ document.addEventListener('keydown', event => {
     else if (!$('activityToast').hidden) { dismissToast(); $('activityButton').focus(); }
   }
   if (event.key === 'Tab' && !$('drawer').hidden) {
-    const controls = [...$('drawer').querySelectorAll('button, input, select, [tabindex="0"]')].filter(node => !node.disabled && !node.hidden);
+    const controls = [...$('drawer').querySelectorAll('button, input, select, [tabindex="0"]')].filter(node => !node.disabled && node.getClientRects().length);
     const first = controls[0], last = controls.at(-1);
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
@@ -514,6 +619,7 @@ document.addEventListener('keydown', event => {
 $('settingsButton').onclick = async () => {
   drawer(true);
   $('authKey').value = localStorage.getItem('muvio-api-key') || '';
+  if (!session?.administrator) return;
   try {
     const data = await api('/settings');
     $('demucs').checked = data.demucs_enabled;
@@ -524,6 +630,18 @@ $('settingsButton').onclick = async () => {
     $('llmModel').value = data.llm_model;
   } catch (error) { show(error.message); }
 };
+$('connectKey').onclick = () => busy($('connectKey'), async () => {
+  localStorage.setItem('muvio-api-key', $('authKey').value);
+  eventStream?.close();
+  clearInterval(pollTimer);
+  jobs = [];
+  completedLinks.clear();
+  autoSave.clear();
+  await loadSession();
+  startUpdates();
+  await refresh();
+  $('settingsButton').onclick();
+});
 $('closeSettings').onclick = $('overlay').onclick = () => drawer(false);
 $('saveSettings').onclick = () => busy($('saveSettings'), async () => {
   localStorage.setItem('muvio-api-key', $('authKey').value);
@@ -544,5 +662,5 @@ for (const [id, path, name] of [['modelDownload', 'whisper', 'Whisper'], ['demuc
   notify(`${name} model download added to Activity.`);
   await refresh();
 });
-refresh();
-startUpdates();
+bootstrap = loadSession().catch(error => show(error.message));
+bootstrap.then(() => { refresh(); startUpdates(); });
