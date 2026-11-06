@@ -96,7 +96,8 @@ def test_error_taxonomy_and_health() -> None:
         missing = client.get("/api/jobs/not-a-job")
         assert missing.status_code == 404 and missing.json()["error"]["code"] == "file.not_found"
         assert client.get("/api/files/../../etc/passwd").status_code in (404, 403)
-        assert client.get("/api/settings").status_code == 200
+        assert client.get("/api/settings").status_code == 403
+        assert client.get("/api/settings", headers={"Authorization": "Api-Key offline-admin-key"}).status_code == 200
 
 
 def test_header_activity_and_favicon() -> None:
