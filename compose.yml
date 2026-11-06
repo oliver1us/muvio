@@ -2,11 +2,68 @@ services:
   muvio:
     build: .
     ports:
+      # Keep private until HTTPS, egress restrictions and capacity are reviewed.
       - "3838:3838"
+      # - "127.0.0.1:3838:3838"
     volumes:
       - ./data:/app/data
     env_file:
       - path: .env
         required: false
-    restart: unless-stopped
+    # Non-sensitive deployment policy lives here. Secrets belong in .env.
+    environment:
+      OUTPUT_DIR: /app/data/downloads
+      STATE_DIR: /app/data
+      MODELS_DIR: /app/data/models
 
+      # Global policy for NEW jobs, for anonymous visitors and administrators.
+      # false: no new media/history on the persistent volume; models/state stay.
+      PERSIST_STORAGE: "true"
+      TEMP_STORAGE_DIR: /tmp/muvio
+      TEMP_FILE_TTL_SECONDS: "3600"
+      TEMP_CLEANUP_INTERVAL_SECONDS: "60"
+      TEMP_HISTORY_TTL_SECONDS: "86400"
+
+      # 0 means unlimited, NOT disabled. Resource controls still apply.
+      ANON_DOWNLOAD_LIMIT: "5"
+      ANON_DOWNLOAD_WINDOW_SECONDS: "86400"
+      SESSION_MAX_AGE_SECONDS: "2592000"
+      # Set true with HTTPS; PUBLIC_ORIGIN must match the browser's exact origin.
+      COOKIE_SECURE: "true"
+      PUBLIC_ORIGIN: "https://6ae4aad9bf99738f85771d13-527a0a.node-us-2b7a.iximiuz.com"
+      # Optional installation-wide gate; API_KEY is always required for admin.
+      API_KEY_REQUIRED: "false"
+      CORS_ALLOW_ORIGIN: ""
+
+      # Conservative starting controls, NOT measured production capacity.
+      MAX_CONCURRENT_JOBS: "3"
+      MAX_PENDING_JOBS: "20"
+      MAX_JOBS_PER_OWNER: "3"
+      MAX_METADATA_REQUESTS: "4"
+      MAX_JOB_MB: "1024"
+      MAX_STORAGE_MB: "10240"
+      MIN_FREE_DISK_MB: "512"
+      MAX_MEDIA_DURATION_SECONDS: "7200"
+      JOB_TIMEOUT_SECONDS: "3600"
+      MAX_UPLOAD_MB: "200"
+      TRANSFER_TIMEOUT_SECONDS: "3600"
+      MAX_TRANSFERS: "8"
+      MAX_TRANSFERS_PER_OWNER: "2"
+      MAX_EVENT_SUBSCRIBERS: "100"
+      RATE_LIMIT_MAX: "10"
+      RATE_LIMIT_WINDOW: "60"
+
+      WHISPER_MODEL: large-v3-turbo
+      WHISPER_DEVICE: auto
+      WHISPER_COMPUTE_TYPE: auto
+      DEMUCS_ENABLED: "false"
+      DEMUCS_MODEL: mdx_extra
+      FFMPEG_PATH: ffmpeg
+      ENABLE_LLM_CLEANUP: "false"
+      LLM_PROVIDER: openai-compatible
+      LLM_BASE_URL: ""
+      LLM_MODEL: ""
+    # /tmp/muvio is ordinary container disk, not a volume or tmpfs.
+    # One application instance only; do not add Uvicorn workers/replicas.
+    stop_grace_period: 5m
+    restart: unless-stopped
