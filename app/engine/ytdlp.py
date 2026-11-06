@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 
 import yt_dlp
 
+from app.config import settings
 from app.engine.audio import audio_tracks
 from app.engine.formats import build_plan, video_options
 from app.engine.naming import filename, unique
@@ -50,7 +51,9 @@ def mapped_error(exc: Exception) -> AppError:
 
 def options() -> dict:
     """Disable global configuration and yt-dlp console output."""
-    return {"ignore_config": True, "quiet": True, "no_warnings": True, "noprogress": True, "noplaylist": True}
+    return {"ignore_config": True, "quiet": True, "no_warnings": True, "noprogress": True, "noplaylist": True,
+            "cachedir": False, "socket_timeout": 20, "retries": 2, "fragment_retries": 2,
+            "playlistend": 100}
 
 
 def tracks(info: dict) -> list[dict]:
@@ -90,6 +93,11 @@ def info(url: str) -> dict:
     data["defaultAudioLanguage"] = data["audioTracks"][0]["language"] if data["audioTracks"] else None
     combinations = video_options(formats)
     data["videoOptions"] = combinations
+    for key, value in list(_cache.items()):
+        if time.time() - value[0] >= 300:
+            _cache.pop(key, None)
+    while len(_cache) >= 128:
+        _cache.pop(next(iter(_cache)), None)
     _cache[url] = (time.time(), data)
     return data
 
@@ -102,10 +110,12 @@ def download(url: str, folder: Path, request: DownloadRequest, progress: Callabl
     def hook(data: dict) -> None:
         if cancelled():
             raise AppError("job.cancelled", "The job was cancelled.")
+        if data.get("downloaded_bytes", 0) > settings.max_job_mb * 1024 * 1024:
+            raise AppError("capacity.exceeded", "The download exceeded the configured size limit.", 413)
         if data.get("status") == "downloading":
             total = data.get("total_bytes") or data.get("total_bytes_estimate") or 0
             progress(100 * data.get("downloaded_bytes", 0) / total if total else 0, data.get("speed"), data.get("eta"), "Downloading")
-    opts = options() | {"format": plan.selector, "outtmpl": str(folder / "%(title).150s [%(id)s].%(ext)s"), "progress_hooks": [hook], "postprocessors": list(plan.postprocessors), "writethumbnail": request.embedThumbnail and request.downloadMode == "audio" and request.audioFormat not in {"best", "wav", "flac", "opus", "ogg"}, "retries": 5, "fragment_retries": 5, "socket_timeout": 20, "overwrites": False}
+    opts = options() | {"format": plan.selector, "outtmpl": str(folder / "%(title).150s [%(id)s].%(ext)s"), "paths": {"home": str(folder), "temp": str(folder)}, "max_filesize": settings.max_job_mb * 1024 * 1024, "progress_hooks": [hook], "postprocessor_hooks": [hook], "postprocessors": list(plan.postprocessors), "writethumbnail": request.embedThumbnail and request.downloadMode == "audio" and request.audioFormat not in {"best", "wav", "flac", "opus", "ogg"}, "overwrites": False}
     if plan.container:
         opts["merge_output_format"] = plan.container
         opts["postprocessors"].append({"key": "FFmpegVideoRemuxer", "preferedformat": plan.container})
@@ -128,7 +138,7 @@ def download(url: str, folder: Path, request: DownloadRequest, progress: Callabl
         if cancelled():
             raise AppError("job.cancelled", "The job was cancelled.") from exc
         raise mapped_error(exc) from exc
-    files = [p for p in folder.iterdir() if p.is_file() and p.suffix.lower() not in {".part", ".ytdl", ".jpg", ".png", ".webp", ".srt", ".vtt"}]
+    files = [p for p in folder.iterdir() if p.is_file() and not p.name.startswith(".") and p.suffix.lower() not in {".part", ".ytdl", ".jpg", ".png", ".webp", ".srt", ".vtt"}]
     if not files:
         raise AppError("file.not_found", "No output file was produced.")
     result = max(files, key=lambda p: p.stat().st_mtime)
@@ -142,16 +152,22 @@ def download(url: str, folder: Path, request: DownloadRequest, progress: Callabl
     return result
 
 
-def download_subtitle(url: str, folder: Path, lang: str, automatic: bool, fmt: str) -> Path:
+def download_subtitle(url: str, folder: Path, lang: str, automatic: bool, fmt: str, cancelled=lambda: False) -> Path:
     """Download one subtitle track through yt-dlp."""
     validate_url(url)
     folder.mkdir(parents=True, exist_ok=True)
-    opts = options() | {"skip_download": True, "writesubtitles": not automatic, "writeautomaticsub": automatic, "subtitleslangs": [lang], "subtitlesformat": f"{fmt}/vtt/srt/best", "outtmpl": str(folder / "%(title).150s.%(ext)s")}
+    def hook(_):
+        if cancelled():
+            raise AppError("job.cancelled", "The job was cancelled.")
+    hook(None)
+    opts = options() | {"skip_download": True, "writesubtitles": not automatic, "writeautomaticsub": automatic, "subtitleslangs": [lang], "subtitlesformat": f"{fmt}/vtt/srt/best", "outtmpl": str(folder / "%(title).150s.%(ext)s"), "paths": {"home": str(folder), "temp": str(folder)}, "progress_hooks": [hook]}
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             ydl.download([url])
     except yt_dlp.utils.DownloadError as exc:
+        hook(None)
         raise mapped_error(exc) from exc
+    hook(None)
     files = list(folder.glob("*.vtt")) + list(folder.glob("*.srt"))
     if not files:
         raise AppError("format.unavailable", "This subtitle track is unavailable.")
