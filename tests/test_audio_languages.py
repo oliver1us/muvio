@@ -127,7 +127,7 @@ def test_api_validates_and_pins_language_before_enqueuing(monkeypatch, mode):
     monkeypatch.setattr(ytdlp, "info", lambda _: data)
     submitted = []
 
-    def submit(kind, url, operation):
+    def submit(kind, url, operation, **_):
         submitted.append(operation)
         return Job("language-test", kind, url)
 
