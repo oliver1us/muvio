@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "explainer",
+  "quality": "showcase",
+  "specification": {
+    "path": "/home/laborant/muvio/.archify/explainer-persistence-multiuser-20261105-221222/candidate.archify.md",
+    "sha256": "49c71dd7ffba18fc84cb298c49a2ff616eaba17b30125258722a58f278392255",
+    "bytes": 15807
+  },
+  "artifact": {
+    "path": "/home/laborant/muvio/docs/persistence-multiuser.html",
+    "sha256": "e648193de36543219c0d2edd4d0b307ca2782a171f51968ca66a960d39db29ce",
+    "bytes": 1038726
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "not-run"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/home/laborant/muvio/.archify/explainer-persistence-multiuser-20261105-221222/review-2/persistence-multiuser.finalize.json",
+    "summaryReceipt": "/home/laborant/muvio/.archify/explainer-persistence-multiuser-20261105-221222/review-2/persistence-multiuser.finalize-summary.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 835,
+  "browserCheck": {
+    "requested": false,
+    "ran": false
+  }
+}
