@@ -173,7 +173,7 @@ def test_api_automatic_audio_only_and_missing_audio(monkeypatch, tmp_path):
     _requests.clear()
     submitted = []
 
-    def submit(kind, url, operation):
+    def submit(kind, url, operation, **_):
         submitted.append(operation)
         return Job("offline-audio", kind, url)
 
