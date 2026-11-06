@@ -1,0 +1,478 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "explainer",
+  "quality": "showcase",
+  "startedAt": "2026-11-05T22:15:37.559Z",
+  "specification": {
+    "path": "/home/laborant/muvio/.archify/explainer-persistence-multiuser-20261105-221222/candidate.archify.md",
+    "sha256": "49c71dd7ffba18fc84cb298c49a2ff616eaba17b30125258722a58f278392255",
+    "bytes": 15807
+  },
+  "artifact": {
+    "path": "/home/laborant/muvio/docs/persistence-multiuser.html",
+    "sha256": "e648193de36543219c0d2edd4d0b307ca2782a171f51968ca66a960d39db29ce",
+    "bytes": 1038726
+  },
+  "stages": {
+    "browser-check": {
+      "status": "not-run",
+      "execution": "not-requested"
+    },
+    "validate": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": null,
+      "execution": "embedded-in-deliver",
+      "command": [
+        "/home/laborant/.nvm/versions/node/v27.0.0-alpha.0.0.0/bin/node",
+        "/home/laborant/muvio/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "explainer",
+        "/home/laborant/muvio/.archify/explainer-persistence-multiuser-20261105-221222/candidate.archify.md",
+        "/home/laborant/muvio/docs/persistence-multiuser.html",
+        "--quality",
+        "showcase",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": true,
+        "command": "validate",
+        "specification": {
+          "sha256": "49c71dd7ffba18fc84cb298c49a2ff616eaba17b30125258722a58f278392255",
+          "bytes": 15807
+        },
+        "validation": {
+          "checksPassed": 4,
+          "checkCount": 4,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        }
+      }
+    },
+    "deliver": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 533,
+      "command": [
+        "/home/laborant/.nvm/versions/node/v27.0.0-alpha.0.0.0/bin/node",
+        "/home/laborant/muvio/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "explainer",
+        "/home/laborant/muvio/.archify/explainer-persistence-multiuser-20261105-221222/candidate.archify.md",
+        "/home/laborant/muvio/docs/persistence-multiuser.html",
+        "--quality",
+        "showcase",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "receiptId": "1f779c15-e213-4ae8-90d1-443f24f2d67f",
+        "ok": true,
+        "command": "deliver",
+        "type": "explainer",
+        "input": "/home/laborant/muvio/.archify/explainer-persistence-multiuser-20261105-221222/candidate.archify.md",
+        "output": "/home/laborant/muvio/docs/persistence-multiuser.html",
+        "explainer": {
+          "preparedSha256": "760cdf500e7938d7c6ee548aba8d12df695b974d01b182200a5d26c3e7c39c14",
+          "dependencies": [
+            {
+              "kind": "diagram-spec",
+              "id": "storage-map",
+              "inline": true,
+              "sha256": "08462b8a7514bfdd1920586b72ce9d2813b2e7ee086bab5552098c1ee64ca8f8",
+              "bytes": 1190
+            },
+            {
+              "kind": "diagram-spec",
+              "id": "admission-flow",
+              "inline": true,
+              "sha256": "06554f35a76a6be4b383d4e3539ca54823f4aa247501681a9194006d3e91d81f",
+              "bytes": 1622
+            }
+          ]
+        },
+        "specification": {
+          "sha256": "49c71dd7ffba18fc84cb298c49a2ff616eaba17b30125258722a58f278392255",
+          "bytes": 15807
+        },
+        "artifact": {
+          "sha256": "e648193de36543219c0d2edd4d0b307ca2782a171f51968ca66a960d39db29ce",
+          "bytes": 1038726
+        },
+        "validation": {
+          "checksPassed": 4,
+          "checkCount": 4,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        },
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      }
+    },
+    "check": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 248,
+      "command": [
+        "/home/laborant/.nvm/versions/node/v27.0.0-alpha.0.0.0/bin/node",
+        "/home/laborant/muvio/.agents/skills/archify/bin/archify.mjs",
+        "check",
+        "/home/laborant/muvio/docs/persistence-multiuser.html",
+        "--require-provenance"
+      ],
+      "receipt": {
+        "ok": true,
+        "file": "/home/laborant/muvio/docs/persistence-multiuser.html",
+        "family": "explainer",
+        "artifact": {
+          "sha256": "e648193de36543219c0d2edd4d0b307ca2782a171f51968ca66a960d39db29ce",
+          "bytes": 1038726
+        },
+        "checks": [
+          {
+            "name": "explainer_structure",
+            "ok": true,
+            "details": [
+              "139 unique DOM IDs"
+            ]
+          },
+          {
+            "name": "explainer_payload_identity",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "explainer_dependencies",
+            "ok": true,
+            "details": [
+              "2 frozen dependencies"
+            ]
+          },
+          {
+            "name": "explainer_native_diagrams",
+            "ok": true,
+            "details": [
+              "storage-map: pass",
+              "admission-flow: pass"
+            ]
+          }
+        ],
+        "composition": {
+          "schemaVersion": 1,
+          "profile": "showcase",
+          "status": "pass",
+          "summary": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "issues": [],
+          "nativeDiagrams": [
+            {
+              "id": "storage-map",
+              "receipt": {
+                "ok": true,
+                "file": "/tmp/archify-explainer-check-VyxX4m/child.html",
+                "artifact": {
+                  "sha256": "74ee2e4bc9d5e1a78af6e085cee48966101fd4d474f2b062826b94850730d100",
+                  "bytes": 837170
+                },
+                "checks": [
+                  {
+                    "name": "single_svg",
+                    "ok": true,
+                    "details": [
+                      "found 1 <svg> block(s)"
+                    ]
+                  },
+                  {
+                    "name": "finite_svg",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "orthogonal_arrows",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "label_route_clearance",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "relationship_crossings",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "relationship_corridors",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "container_border_runs",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "route_rhythm",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "legend_clearance",
+                    "ok": true,
+                    "details": []
+                  }
+                ],
+                "composition": {
+                  "schemaVersion": 1,
+                  "profile": "showcase",
+                  "status": "pass",
+                  "summary": {
+                    "errors": 0,
+                    "warnings": 0
+                  },
+                  "metrics": {
+                    "properCrossings": 0,
+                    "resolvedCrossovers": 0,
+                    "ambiguousCorridors": 0,
+                    "arrowheadCollisions": 0,
+                    "containerBorderRuns": 0,
+                    "labelRouteClearanceIssues": 0,
+                    "labelCanvasOverflowIssues": 0,
+                    "minLabelRouteClearance": 79.6,
+                    "desktopReadabilityIssues": 0,
+                    "viewportHeightIssues": 0,
+                    "minProjectedNodeTextPx": 8,
+                    "maxBends": 1,
+                    "routesOverSuggestedBends": 0,
+                    "maxStretch": 1,
+                    "routesOverSuggestedStretch": 0,
+                    "minSegmentPx": 142,
+                    "minInteriorSegmentPx": null,
+                    "shortSegmentCount": 0,
+                    "shortEndpointSegmentCount": 0,
+                    "shortInteriorSegmentCount": 0,
+                    "microSegmentCount": 0
+                  },
+                  "suggestedLimits": {
+                    "bendsPerRelationship": 2,
+                    "stretch": 1.35,
+                    "segmentPx": 16,
+                    "microSegmentPx": 8
+                  },
+                  "routeReview": {
+                    "crossings": [],
+                    "detours": []
+                  },
+                  "leadingSpace": {
+                    "measured": true,
+                    "emptyTopPx": 80,
+                    "emptyTopRatio": 0.104,
+                    "occupiedTop": 80,
+                    "viewBoxTop": 0,
+                    "canvasHeight": 766,
+                    "typicalNodeHeight": 60,
+                    "reviewSuggested": false
+                  },
+                  "desktopReadability": {
+                    "budgetBasis": "legacy-930",
+                    "readerContract": "declared-wide-v1",
+                    "availableDiagramWidth": 930,
+                    "actualBudgetPx": 930,
+                    "limit": "legacy",
+                    "requestedTargetPx": 7.5,
+                    "requestedTargetMet": true,
+                    "hardFloorPx": 6,
+                    "hardFloorMet": true,
+                    "minimumOwner": {
+                      "kind": "edge",
+                      "id": "visitor-to-muvio-1",
+                      "from": "visitor",
+                      "to": "muvio"
+                    },
+                    "minimumSourceTextPx": 8,
+                    "minimumProjectedTextPx": 8,
+                    "semanticTextCount": 11
+                  },
+                  "issues": []
+                }
+              }
+            },
+            {
+              "id": "admission-flow",
+              "receipt": {
+                "ok": true,
+                "file": "/tmp/archify-explainer-check-A9qH1Z/child.html",
+                "artifact": {
+                  "sha256": "8b303be47a600bd07784c90c1a164801731bf571b754fb669f2fda078cce161a",
+                  "bytes": 838456
+                },
+                "checks": [
+                  {
+                    "name": "single_svg",
+                    "ok": true,
+                    "details": [
+                      "found 1 <svg> block(s)"
+                    ]
+                  },
+                  {
+                    "name": "finite_svg",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "orthogonal_arrows",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "label_route_clearance",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "relationship_crossings",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "relationship_corridors",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "container_border_runs",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "route_rhythm",
+                    "ok": true,
+                    "details": []
+                  },
+                  {
+                    "name": "legend_clearance",
+                    "ok": true,
+                    "details": []
+                  }
+                ],
+                "composition": {
+                  "schemaVersion": 1,
+                  "profile": "showcase",
+                  "status": "pass",
+                  "summary": {
+                    "errors": 0,
+                    "warnings": 0
+                  },
+                  "metrics": {
+                    "properCrossings": 0,
+                    "resolvedCrossovers": 0,
+                    "ambiguousCorridors": 0,
+                    "arrowheadCollisions": 0,
+                    "containerBorderRuns": 0,
+                    "labelRouteClearanceIssues": 0,
+                    "labelCanvasOverflowIssues": 0,
+                    "minLabelRouteClearance": 72.7,
+                    "desktopReadabilityIssues": 0,
+                    "viewportHeightIssues": 0,
+                    "minProjectedNodeTextPx": 7.0588235294117645,
+                    "maxBends": 0,
+                    "routesOverSuggestedBends": 0,
+                    "maxStretch": 1,
+                    "routesOverSuggestedStretch": 0,
+                    "minSegmentPx": 8,
+                    "minInteriorSegmentPx": null,
+                    "shortSegmentCount": 1,
+                    "shortEndpointSegmentCount": 1,
+                    "shortInteriorSegmentCount": 0,
+                    "microSegmentCount": 0
+                  },
+                  "suggestedLimits": {
+                    "bendsPerRelationship": 2,
+                    "stretch": 1.35,
+                    "segmentPx": 16,
+                    "microSegmentPx": 8
+                  },
+                  "routeReview": {
+                    "crossings": [],
+                    "detours": []
+                  },
+                  "leadingSpace": {
+                    "measured": false,
+                    "reviewSuggested": false
+                  },
+                  "desktopReadability": {
+                    "budgetBasis": "legacy-930",
+                    "readerContract": "declared-wide-v1",
+                    "availableDiagramWidth": 930,
+                    "actualBudgetPx": 930,
+                    "limit": "legacy",
+                    "requestedTargetPx": null,
+                    "requestedTargetMet": null,
+                    "hardFloorPx": 6,
+                    "hardFloorMet": true,
+                    "minimumOwner": {
+                      "kind": "edge",
+                      "id": "enqueue-to-process-1",
+                      "from": "enqueue",
+                      "to": "process"
+                    },
+                    "minimumSourceTextPx": 8,
+                    "minimumProjectedTextPx": 7.0588235294117645,
+                    "semanticTextCount": 12
+                  },
+                  "issues": []
+                }
+              }
+            }
+          ]
+        },
+        "diagnostics": [],
+        "provenance": "current",
+        "deliveryReceiptId": "1f779c15-e213-4ae8-90d1-443f24f2d67f"
+      }
+    }
+  },
+  "browserCheck": {
+    "requested": false,
+    "ran": false
+  },
+  "diagnostics": [],
+  "evidence": {
+    "receipt": "/home/laborant/muvio/.archify/explainer-persistence-multiuser-20261105-221222/review-2/persistence-multiuser.finalize.json",
+    "summaryReceipt": "/home/laborant/muvio/.archify/explainer-persistence-multiuser-20261105-221222/review-2/persistence-multiuser.finalize-summary.json"
+  },
+  "visualReview": "not-requested",
+  "finishedAt": "2026-11-05T22:15:38.395Z",
+  "durationMs": 835,
+  "update": {
+    "status": "unavailable",
+    "installedVersion": null,
+    "availableVersion": null,
+    "releaseNotes": null,
+    "checkedAt": null,
+    "source": null,
+    "noticeRequired": false,
+    "noticeText": null,
+    "reason": "cache-valid"
+  }
+}
