@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "1f779c15-e213-4ae8-90d1-443f24f2d67f",
+  "status": "current",
+  "command": "deliver",
+  "type": "explainer",
+  "input": "/home/laborant/muvio/.archify/explainer-persistence-multiuser-20261105-221222/candidate.archify.md",
+  "output": "/home/laborant/muvio/docs/persistence-multiuser.html",
+  "specification": {
+    "sha256": "49c71dd7ffba18fc84cb298c49a2ff616eaba17b30125258722a58f278392255",
+    "bytes": 15807
+  },
+  "artifact": {
+    "sha256": "e648193de36543219c0d2edd4d0b307ca2782a171f51968ca66a960d39db29ce",
+    "bytes": 1038726
+  },
+  "explainer": {
+    "preparedSha256": "760cdf500e7938d7c6ee548aba8d12df695b974d01b182200a5d26c3e7c39c14",
+    "dependencies": [
+      {
+        "kind": "diagram-spec",
+        "id": "storage-map",
+        "inline": true,
+        "sha256": "08462b8a7514bfdd1920586b72ce9d2813b2e7ee086bab5552098c1ee64ca8f8",
+        "bytes": 1190
+      },
+      {
+        "kind": "diagram-spec",
+        "id": "admission-flow",
+        "inline": true,
+        "sha256": "06554f35a76a6be4b383d4e3539ca54823f4aa247501681a9194006d3e91d81f",
+        "bytes": 1622
+      }
+    ]
+  }
+}
