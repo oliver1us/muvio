@@ -21,7 +21,7 @@
         </div>
         <section id="activityPanel" class="activity-panel" aria-label="Activity" hidden>
           <div class="section-title"><div><span class="eyebrow">YOUR FILES</span><h2>Activity</h2></div><button id="refresh" class="quiet" type="button">Refresh <span aria-hidden="true">↻</span></button></div>
-          <p class="muted activity-help">When a file is ready, save it to your device here.</p>
+          <p class="muted activity-help">Temporary files try to save automatically while this page is open. Your browser may block this; the manual button remains available.</p>
           <div id="jobs" class="job-list"><p class="empty-state">Your downloads will appear here.</p></div>
         </section>
       </div>
@@ -42,6 +42,7 @@
       <button type="submit" id="fetch">Find media <span aria-hidden="true">↗</span></button>
     </form>
     <p id="urlHelp" class="services">YouTube, Instagram, TikTok, SoundCloud <span>& many more.</span></p>
+    <p id="sessionStatus" class="muted" role="status" aria-live="polite">Connecting to your private session…</p>
     <div id="message" role="alert" tabindex="-1" hidden></div>
 
     <section id="picker" class="card" aria-labelledby="pickerTitle" hidden>
@@ -88,12 +89,12 @@
         <div id="subtitleControls"><label id="subtitleSearchLabel" for="subtitleSearch" hidden>Find a language<input id="subtitleSearch" type="search" name="subtitleSearch" placeholder="Search languages…" autocomplete="off"></label><label for="subtitleTrack">Subtitle language<select id="subtitleTrack"></select></label><p id="subtitleInfo" class="muted subtitle-info"></p><button class="primary download-button" id="subtitleDownload" type="button">Download subtitles <span aria-hidden="true">↓</span></button></div>
         <p id="noSubtitles" class="empty-state" hidden>No subtitles were found. You can generate a transcript below.</p>
         <details class="advanced"><summary>Advanced options <span class="advanced-chevron" aria-hidden="true">⌄</span></summary><label for="subtitleFormat">Subtitle format<select id="subtitleFormat"><option value="srt">SRT · widely compatible</option><option value="vtt">VTT · for the web</option></select></label><button id="embedSelected" class="text-button" type="button">Include this track in the video <span aria-hidden="true">↗</span></button></details>
-        <details id="transcriptionOptions" class="secondary-feature"><summary><span>Need your own transcript?<small>Generate one locally from this link.</small></span><span aria-hidden="true">+</span></summary><div class="secondary-content"><p class="muted">Requires a Whisper model. Download it in Settings first. Transcription runs on this server.</p><div class="fields"><label for="mode">Mode<select id="mode"><option value="quick">Quick · speech</option><option value="studio">Studio · songs & talks</option></select></label><label for="language">Language<select id="language"><option value="">Auto-detect</option><option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="ja">Japanese</option></select></label></div><div class="checks"><label class="check"><input type="checkbox" id="separate"> Separate vocals (Demucs)</label><label class="check"><input type="checkbox" id="focus"> Vocal focus</label><label class="check"><input type="checkbox" id="ai"> <span id="aiLabel">Send transcript to optional AI cleanup</span></label></div><button id="transcribe" type="button">Generate transcript <span aria-hidden="true">→</span></button></div></details>
+        <details id="transcriptionOptions" class="secondary-feature" hidden><summary><span>Need your own transcript?<small>Administrator-only until public transcription quotas are defined.</small></span><span aria-hidden="true">+</span></summary><div class="secondary-content"><p class="muted">Requires a Whisper model. Download it in Settings first. Transcription runs on this server.</p><div class="fields"><label for="mode">Mode<select id="mode"><option value="quick">Quick · speech</option><option value="studio">Studio · songs & talks</option></select></label><label for="language">Language<select id="language"><option value="">Auto-detect</option><option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="ja">Japanese</option></select></label></div><div class="checks"><label class="check"><input type="checkbox" id="separate"> Separate vocals (Demucs)</label><label class="check"><input type="checkbox" id="focus"> Vocal focus</label><label class="check"><input type="checkbox" id="ai"> <span id="aiLabel">Send transcript to optional AI cleanup</span></label></div><button id="transcribe" type="button">Generate transcript <span aria-hidden="true">→</span></button></div></details>
       </section>
     </section>
 
-    <details class="upload secondary-feature"><summary><span>Already have a file?<small>Transcribe audio or video from your device.</small></span><span aria-hidden="true">+</span></summary><div class="secondary-content"><p class="muted">Processed on this server. Requires a local Whisper model, available in Settings.</p><label for="upload">Choose an audio or video file<input type="file" id="upload" name="upload" accept="audio/*,video/*"></label><p class="muted">Uses the transcription options in the Subtitles tab, or their defaults.</p><button id="uploadButton" type="button">Transcribe file <span aria-hidden="true">→</span></button></div></details>
-    <footer><span class="footer-brand">muvio.</span><p>No ads. No accounts. No tracking.<br>Only save media you have permission to download.</p><span class="footer-note">Less noise. More yours.</span></footer>
+    <details id="uploadOptions" class="upload secondary-feature" hidden><summary><span>Already have a file?<small>Administrator-only transcription from your device.</small></span><span aria-hidden="true">+</span></summary><div class="secondary-content"><p class="muted">Processed on this server. Requires a local Whisper model, available in Settings.</p><label for="upload">Choose an audio or video file<input type="file" id="upload" name="upload" accept="audio/*,video/*"></label><p class="muted">Uses the transcription options in the Subtitles tab, or their defaults.</p><button id="uploadButton" type="button">Transcribe file <span aria-hidden="true">→</span></button></div></details>
+    <footer><span class="footer-brand">muvio.</span><p>No ads or analytics. A private cookie isolates your work.<br>Only save media you have permission to download.</p><span class="footer-note">Less noise. More yours.</span></footer>
   </main>
 
   <div id="overlay" hidden></div>
@@ -102,9 +103,13 @@
     <p class="muted">Preferences are saved on this server. Worker changes take effect after restart.</p>
     <p id="settingsMessage" role="alert" hidden></p>
     <label for="authKey">Server API key<input type="password" id="authKey" autocomplete="off"></label>
+    <button id="connectKey" type="button">Use key / leave administration</button>
+    <p class="muted">Accounts are not enabled. The installation key grants administration, not access to other visitors' work. Clear the key to leave administration.</p>
+    <div id="adminSettings" hidden>
     <h3>Local transcription</h3><label for="whisperModel">Whisper model<input id="whisperModel" value="large-v3-turbo" autocomplete="off" spellcheck="false"></label><button id="modelDownload" type="button">Download Whisper model</button>
     <label class="check"><input id="demucs" type="checkbox"> Enable Demucs vocal separation</label><button id="demucsDownload" type="button">Download Demucs model</button>
     <hr><h3>Optional AI cleanup</h3><p class="muted">When selected, transcript text is sent to your configured provider.</p><label class="check"><input id="llmEnabled" type="checkbox"> Enable cleanup</label><label for="llmProvider">Provider<select id="llmProvider"><option value="openai-compatible">OpenAI-compatible</option><option value="anthropic">Anthropic</option><option value="ollama">Ollama (local)</option></select></label><label for="llmBase">Endpoint<input id="llmBase" type="url" placeholder="http://localhost:11434…" autocomplete="off" spellcheck="false"></label><label for="llmModel">Model<input id="llmModel" autocomplete="off" spellcheck="false"></label><label for="llmKey">Provider API key<input id="llmKey" type="password" autocomplete="new-password" placeholder="Leave empty to keep the existing key…"></label><button class="primary" id="saveSettings" type="button">Save settings</button><p class="muted">Muvio does not bypass DRM or private access.</p>
+    </div>
   </aside>
   <script type="module" src="/js/main.js"></script>
 </body>
