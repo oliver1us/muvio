@@ -1,5 +1,4 @@
 """Optional Demucs separation, invoked only after explicit installation."""
-import hashlib
 import importlib.util
 import os
 from pathlib import Path
@@ -29,16 +28,12 @@ def download_model() -> str:
         raise AppError("demucs.failed", "Could not download the Demucs model: " + str(exc)[:200]) from exc
 
 
-def separate(source: Path, cache: Path) -> Path | None:
-    """Return a cached vocal stem; return None if Demucs is not installed."""
+def separate(source: Path, workspace: Path) -> Path | None:
+    """Separate within a private job, never cache media across identities."""
     if not settings.demucs_enabled or importlib.util.find_spec("demucs") is None or not model_marker().exists():
         return None
     os.environ["TORCH_HOME"] = str(settings.models_dir / "torch")
-    digest = hashlib.sha256()
-    with source.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    output = cache / digest.hexdigest()
+    output = workspace
     stem = output / settings.demucs_model / source.stem / "vocals.wav"
     if stem.exists():
         return stem
