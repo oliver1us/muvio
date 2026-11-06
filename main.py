@@ -1,10 +1,10 @@
 """Muvio FastAPI application and static frontend."""
-import hmac
 import logging
-import secrets
+import os
+import tempfile
 import time
-from collections import defaultdict, deque
-from contextlib import asynccontextmanager
+from collections import OrderedDict, deque
+from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -18,51 +18,116 @@ from app.api.routes import router
 from app.config import load_settings, settings
 from app.errors import AppError, error_body
 from app.queue.jobs import queue
+from app.identity import COOKIE, check_csrf, identify, signing_key
+from app.body_limit import BodyLimitMiddleware
+
+
+class RedactDownloadQueries(logging.Filter):
+    def filter(self, record):
+        if isinstance(record.args, tuple) and len(record.args) == 5:
+            args = list(record.args)
+            if str(args[2]).startswith("/api/files/"):
+                args[2] = str(args[2]).split("?", 1)[0]
+                record.args = tuple(args)
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(RedactDownloadQueries())
+
+
+@contextmanager
+def single_instance():
+    """Refuse multiple workers/processes sharing this installation's state."""
+    import fcntl
+    settings.state_root.mkdir(parents=True, exist_ok=True)
+    with (settings.state_root / ".instance.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RuntimeError("Muvio requires one process per STATE_DIR; do not add workers/replicas") from exc
+        yield
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start local workers and restore history."""
     load_settings()
+    os.umask(0o077)
+    if settings.state_dir is None:
+        logging.warning("STATE_DIR is unset; preserving legacy state at %s. Set STATE_DIR explicitly before changing OUTPUT_DIR.", settings.state_root)
     if settings.api_key_required and not settings.api_key:
         raise RuntimeError("API_KEY_REQUIRED needs a configured API_KEY")
-    app.state.signing_key = (settings.signing_secret or secrets.token_hex(32)).encode()
-    await queue.start()
-    logging.info("Muvio ready on http://localhost:3838")
-    try:
-        yield
-    finally:
-        await queue.stop()
+    with single_instance():
+        app.state.signing_key = signing_key()
+        await queue.start()
+        incoming = settings.temp_storage_dir / "incoming"
+        incoming.mkdir(mode=0o700, exist_ok=True)
+        old_tempdir, tempfile.tempdir = tempfile.tempdir, str(incoming.resolve())
+        logging.info("Muvio ready on http://localhost:3838")
+        try:
+            yield
+        finally:
+            await queue.stop()
+            tempfile.tempdir = old_tempdir
 
 
 app = FastAPI(title="muvio", version="0.1.0", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=[x.strip() for x in settings.cors_allow_origin.split(",") if x.strip()], allow_methods=["GET", "POST", "PUT", "DELETE"], allow_headers=["Authorization", "Content-Type"])
-_requests: dict[str, deque[float]] = defaultdict(deque)
+app.add_middleware(BodyLimitMiddleware)
+app.add_middleware(CORSMiddleware, allow_origins=[x.strip() for x in settings.cors_allow_origin.split(",") if x.strip()], allow_methods=["GET"], allow_headers=["Authorization", "Content-Type"])
+_requests: OrderedDict[str, deque[float]] = OrderedDict()
+
+
+def application_error(exc: AppError):
+    body = error_body(exc.code, str(exc))
+    body["error"]["context"].update(exc.context)
+    return JSONResponse(body, status_code=exc.status_code, headers=exc.headers)
 
 
 @app.middleware("http")
 async def authenticate(request: Request, call_next):
-    """Require optional API key for protected endpoints."""
-    if settings.api_key_required and request.url.path.startswith("/api/") and request.url.path != "/api/health" and not request.url.path.startswith("/api/files/"):
-        value = request.headers.get("Authorization", "")
-        if not hmac.compare_digest(value, "Api-Key " + settings.api_key):
-            return JSONResponse(error_body("auth.missing", "Enter the API key in Settings."), status_code=401)
-    if request.method == "POST" and request.url.path in {"/api/download", "/api/transcribe"}:
+    """Resolve per-browser ownership, enforce CSRF and bound expensive requests."""
+    if not request.url.path.startswith("/api/"):
+        return await call_next(request)
+    actor, cookie = identify(request)
+    request.state.principal = actor
+    try:
+        check_csrf(request)
+        path = request.url.path
+        if settings.api_key_required and path not in {"/api/health", "/api/session"} and not path.startswith("/api/files/") and request.method != "OPTIONS" and not actor.admin:
+            raise AppError("auth.missing", "Enter the installation API key in Settings.", 401)
+        if (path == "/api/transcribe" or path.startswith("/api/models/") or path == "/api/settings") and not actor.admin:
+            raise AppError("auth.forbidden", "An administrator API key is required for this operation.", 403)
+        if request.method == "POST" and path == "/api/transcribe":
+            length = request.headers.get("Content-Length")
+            if length and int(length) > (settings.max_upload_mb + 1) * 1024 * 1024:
+                raise AppError("capacity.exceeded", "The upload exceeds the configured size limit.", 413)
+    except AppError as exc:
+        return application_error(exc)
+    expensive = request.url.path in {"/api/info", "/api/subtitles", "/api/download", "/api/subtitle-download", "/api/transcribe"} or request.url.path.startswith("/api/models/")
+    if expensive:
         client = request.client.host if request.client else "unknown"
-        recent = _requests[client]
+        recent = _requests.setdefault(client, deque())
+        _requests.move_to_end(client)
+        if len(_requests) > 10000:
+            _requests.popitem(last=False)
         now = time.monotonic()
         while recent and now - recent[0] > settings.rate_limit_window:
             recent.popleft()
         if len(recent) >= settings.rate_limit_max:
             return JSONResponse(error_body("rate.limited", "Too many jobs. Please try again shortly."), status_code=429, headers={"RateLimit-Limit": str(settings.rate_limit_max), "RateLimit-Remaining": "0", "RateLimit-Reset": str(max(0, int(settings.rate_limit_window - (now - recent[0]))))})
         recent.append(now)
-    return await call_next(request)
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/files/"):
+        response.set_cookie(COOKIE, cookie, max_age=settings.session_max_age_seconds, httponly=True,
+                            secure=settings.cookie_secure, samesite="lax", path="/")
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.exception_handler(AppError)
 async def app_error(request: Request, exc: AppError):
     """Return structured application failures."""
-    return JSONResponse(error_body(exc.code, str(exc)), status_code=exc.status_code)
+    return application_error(exc)
 
 
 @app.exception_handler(StarletteHTTPException)
