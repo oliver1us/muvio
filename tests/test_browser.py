@@ -3,7 +3,7 @@ import threading
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -67,13 +67,18 @@ def ui(browser, static_url):
             return
         payload = request.post_data_json if request.post_data and "application/json" in request.headers.get("content-type", "") else None
         state["requests"].append((request.method, path, payload))
-        if path == "/api/info":
+        if path == "/api/session":
+            result = {"identity": "anonymous", "administrator": state.get("admin", True), "accounts_enabled": False,
+                      "persist_storage": True, "quota": state.get("quota", {"limit": 5, "remaining": 5, "next_available_at": None})}
+        elif path == "/api/info":
             if state.get("info_error"):
                 route.fulfill(status=400, json={"status": "error", "error": {"context": {"message": state["info_error"]}}})
                 return
             result = state["media"]
         elif path == "/api/jobs":
-            result = state["jobs"]
+            query = parse_qs(urlsplit(request.url).query)
+            start, limit = int(query.get("cursor", [0])[0]), int(query.get("limit", [30])[0])
+            result = {"items": state["jobs"][start:start + limit], "next_cursor": str(start + limit) if len(state["jobs"]) > start + limit else None}
         elif path.startswith("/api/jobs/"):
             job = next(job for job in state["jobs"] if job["id"] == path.rsplit("/", 1)[1])
             if request.method == "DELETE":
@@ -448,3 +453,81 @@ def test_missing_original_metadata_and_unknown_language_are_not_guessed(ui):
     expect(page.locator("#videoAudioSummary")).to_contain_text("Unknown language")
     expect(page.locator("#videoAudioSummary")).to_contain_text("Original track not identified")
     expect(page.locator("#videoAudioLanguage option")).to_have_count(2)
+
+
+def test_temporary_autosave_with_activity_closed_repeated_poll_and_reload(ui):
+    page, state = ui
+    page.evaluate("localStorage.setItem('muvio-api-key', 'offline-admin')")
+    page.reload()
+    page.clock.install()
+    find_media(page)
+    page.locator("#videoDownload").click()
+    expect(page.locator("#activityPanel")).not_to_be_visible()
+    downloads = []
+    page.on("download", lambda download: downloads.append(download))
+    state["jobs"][0].update(status="done", storage_mode="temporary", availability="available",
+                            filename="video.mp4", expires_at="2099-01-01T00:00:00+00:00")
+    with page.expect_download() as download:
+        page.clock.fast_forward(2600)
+    assert download.value.suggested_filename == "video.mp4"
+    page.clock.fast_forward(6000)
+    expect(page.locator("#sessionStatus")).to_contain_text("Administrator")
+    assert len(downloads) == 1
+    page.locator("#activityButton").click()
+    expect(page.get_by_role("link", name="Save file")).to_be_visible()
+    expect(page.locator("#jobs")).to_contain_text("Temporary · available until")
+    page.reload()
+    page.clock.fast_forward(3000)
+    expect(page.locator("#fetch")).to_be_enabled()
+    assert len(downloads) == 1  # History and reload do not initiate more saves.
+
+
+def test_anonymous_unlimited_session_hides_administration_and_expired_links(ui):
+    page, state = ui
+    state["admin"] = False
+    state["quota"] = {"limit": 0, "remaining": None, "next_available_at": None}
+    state["jobs"] = [{"id": "expired", "kind": "download", "status": "done", "storage_mode": "temporary",
+                      "availability": "expired", "filename": "video.mp4"}]
+    page.reload()
+    expect(page.locator("#sessionStatus")).to_have_text("Anonymous session · Unlimited")
+    expect(page.locator("#uploadOptions")).not_to_be_visible()
+    page.locator("#activityButton").click()
+    expect(page.locator("#jobs")).to_contain_text("Expired")
+    expect(page.locator("#jobs a")).to_have_count(0)
+    page.locator("#settingsButton").click()
+    expect(page.locator("#connectKey")).to_be_visible()
+    expect(page.locator("#adminSettings")).not_to_be_visible()
+
+
+def test_initial_history_and_other_clients_do_not_autosave(ui):
+    page, state = ui
+    downloads = []
+    page.on("download", lambda download: downloads.append(download))
+    state["jobs"] = [{"id": "other-tab", "kind": "subtitle", "status": "done", "storage_mode": "temporary",
+                      "availability": "available", "filename": "captions.srt"}]
+    page.reload()
+    page.locator("#activityButton").click()
+    expect(page.get_by_role("link", name="Save file")).to_be_visible()
+    page.locator("#refresh").click()
+    expect(page.locator("#jobs")).to_contain_text("captions.srt")
+    assert downloads == []
+
+
+def test_background_updates_keep_older_pages_and_refresh_their_status(ui):
+    page, state = ui
+    state["jobs"] = [{"id": str(index), "kind": "download", "status": "done", "availability": "available",
+                      "storage_mode": "persistent", "filename": f"file-{index}.mp4"} for index in range(65)]
+    page.evaluate("localStorage.setItem('muvio-api-key', 'offline-admin')")
+    page.reload()
+    page.clock.install()
+    page.locator("#activityButton").click()
+    expect(page.locator("#jobs article")).to_have_count(30)
+    page.get_by_role("button", name="Show older activity").click()
+    expect(page.locator("#jobs article")).to_have_count(60)
+    state["jobs"][0]["availability"] = "missing"
+    page.clock.fast_forward(3000)
+    expect(page.locator("#jobs article")).to_have_count(60)
+    expect(page.locator("#jobs article").first).to_contain_text("Not available")
+    page.get_by_role("button", name="Show older activity").click()
+    expect(page.locator("#jobs article")).to_have_count(65)
+    expect(page.get_by_role("button", name="Show older activity")).not_to_be_visible()
