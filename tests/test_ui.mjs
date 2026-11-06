@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { chooseVideo, matchingVideo, groupSubtitles, subtitleLabel, audioTrackLabel } from '../app/web/js/media.mjs';
+import { autoSaveTracker, retentionLabel } from '../app/web/js/activity.mjs';
 
 const choices = heights => heights.map(height => ({ height, codec: 'h264', container: 'mp4' }));
 
@@ -80,4 +81,25 @@ test('audio labels distinguish source originals, regional variants and unknown t
   assert.equal(audioTrackLabel({ language: 'en-desc' }), 'English · Audio description');
   assert.equal(audioTrackLabel({ language: 'und' }), 'Unknown language');
   assert.equal(audioTrackLabel(null), 'Unknown language');
+});
+
+test('temporary autosave is once, page-owned, and independent of Activity', () => {
+  const values = new Map();
+  const storage = { getItem: key => values.get(key), setItem: (key, value) => values.set(key, value) };
+  const tracker = autoSaveTracker(storage);
+  const job = { id: 'own', kind: 'download', status: 'done', storage_mode: 'temporary', availability: 'available' };
+  assert.equal(tracker.claim(job), false); // Initial history or another tab.
+  tracker.start(job.id);
+  assert.equal(tracker.claim({ ...job, status: 'running' }), false);
+  assert.equal(tracker.claim(job), true);
+  assert.equal(tracker.claim(job), false); // Repeated SSE/poll.
+  const reload = autoSaveTracker(storage);
+  reload.start(job.id);
+  assert.equal(reload.claim(job), false);
+  for (const changes of [{ kind: 'transcribe' }, { storage_mode: 'persistent' }, { availability: 'expired' }, { availability: 'missing' }]) {
+    tracker.start(job.id);
+    assert.equal(tracker.claim({ ...job, ...changes }), false);
+  }
+  assert.equal(retentionLabel({ ...job, availability: 'expired' }), 'Expired');
+  assert.equal(retentionLabel({ ...job, availability: 'missing' }), 'Not available');
 });
